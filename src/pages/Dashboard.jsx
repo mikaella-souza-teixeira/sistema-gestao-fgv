@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import Usuarios from './Usuarios'
+import PassagensDiarias from './PassagensDiarias'
 
 const modulos = [
-  { id: 'diarias', nome: 'Diárias', icone: '✈️', descricao: 'Solicitações e controle de diárias', cor: '#2d7a4f' },
+  { id: 'passagens', nome: 'Passagens e Diárias', icone: '✈️', descricao: 'Solicitações de passagens aéreas e diárias', cor: '#2d7a4f' },
   { id: 'tdrs', nome: 'TDRs', icone: '📄', descricao: 'Termos de Referência', cor: '#1d4ed8' },
   { id: 'aquisicoes', nome: 'Aquisições', icone: '🛒', descricao: 'Processos de aquisição', cor: '#b45309' },
   { id: 'financeiro', nome: 'Financeiro', icone: '💰', descricao: 'Orçamento e execução financeira', cor: '#7c3aed' },
@@ -153,8 +154,9 @@ export default function Dashboard({ usuario, perfilUsuario }) {
           )}
 
           {moduloAtivo === 'usuarios' && isAdmin && <Usuarios />}
+          {moduloAtivo === 'passagens' && <PassagensDiarias perfilUsuario={perfilUsuario} />}
 
-          {modulos.map(m => moduloAtivo === m.id && (
+          {modulos.filter(m => m.id !== 'passagens').map(m => moduloAtivo === m.id && (
             <div key={m.id} style={styles.moduloArea}>
               <div style={styles.moduloPlaceholder}>
                 <span style={styles.moduloIconeGrande}>{m.icone}</span>
