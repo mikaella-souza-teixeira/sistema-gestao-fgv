@@ -2,17 +2,47 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { gerarDocumentoWord, calcularTotais, formatarMoeda } from '../lib/gerarDocumento'
 
+// ─── Lista de bancos brasileiros com código COMPE ────────────────────────────
+const BANCOS_BR = [
+  { codigo: '001', nome: 'Banco do Brasil' },
+  { codigo: '033', nome: 'Santander' },
+  { codigo: '041', nome: 'Banrisul' },
+  { codigo: '047', nome: 'Banese' },
+  { codigo: '070', nome: 'BRB' },
+  { codigo: '077', nome: 'Inter' },
+  { codigo: '085', nome: 'Via Credi' },
+  { codigo: '097', nome: 'Credisis' },
+  { codigo: '099', nome: 'Uniprime' },
+  { codigo: '104', nome: 'Caixa Econômica Federal' },
+  { codigo: '197', nome: 'Stone' },
+  { codigo: '208', nome: 'BTG Pactual' },
+  { codigo: '212', nome: 'Banco Original' },
+  { codigo: '237', nome: 'Bradesco' },
+  { codigo: '260', nome: 'Nubank' },
+  { codigo: '290', nome: 'PagBank' },
+  { codigo: '323', nome: 'Mercado Pago' },
+  { codigo: '336', nome: 'C6 Bank' },
+  { codigo: '341', nome: 'Itaú Unibanco' },
+  { codigo: '380', nome: 'PicPay' },
+  { codigo: '422', nome: 'Safra' },
+  { codigo: '655', nome: 'Votorantim' },
+  { codigo: '748', nome: 'Sicredi' },
+  { codigo: '756', nome: 'Sicoob' },
+  { codigo: 'outro', nome: 'Outro' },
+]
+
+// ─── Tipos de diárias ─────────────────────────────────────────────────────────
 const DIARIAS_LISTA = [
-  { key: 'diaria_intl',             label: 'Diária Internacional',         valor: 400, moeda: 'US$' },
-  { key: 'meia_diaria_intl',        label: 'Meia Diária Internacional',    valor: 200, moeda: 'US$' },
-  { key: 'diaria_capital',          label: 'Diária Capital',               valor: 450, moeda: 'R$' },
-  { key: 'meia_diaria_capital',     label: 'Meia Diária Capital',          valor: 225, moeda: 'R$' },
-  { key: 'diaria_cidade',           label: 'Diária Cidade',                valor: 300, moeda: 'R$' },
-  { key: 'meia_diaria_cidade',      label: 'Meia Diária Cidade',           valor: 150, moeda: 'R$' },
-  { key: 'diaria_campo',            label: 'Diária de Campo',              valor: 300, moeda: 'R$' },
-  { key: 'meia_diaria_campo',       label: 'Meia Diária de Campo',         valor: 150, moeda: 'R$' },
-  { key: 'meia_diaria_deslocamento',label: 'Meia Diária de Deslocamento',  valor: 225, moeda: 'R$' },
-  { key: 'meia_viagem',             label: 'Meia Viagem sem Pernoite',     valor: 225, moeda: 'R$' },
+  { key: 'diaria_intl',              label: 'Diária Internacional',        valor: 400, moeda: 'US$' },
+  { key: 'meia_diaria_intl',         label: 'Meia Diária Internacional',   valor: 200, moeda: 'US$' },
+  { key: 'diaria_capital',           label: 'Diária Capital',              valor: 450, moeda: 'R$'  },
+  { key: 'meia_diaria_capital',      label: 'Meia Diária Capital',         valor: 225, moeda: 'R$'  },
+  { key: 'diaria_cidade',            label: 'Diária Cidade',               valor: 300, moeda: 'R$'  },
+  { key: 'meia_diaria_cidade',       label: 'Meia Diária Cidade',          valor: 150, moeda: 'R$'  },
+  { key: 'diaria_campo',             label: 'Diária de Campo',             valor: 300, moeda: 'R$'  },
+  { key: 'meia_diaria_campo',        label: 'Meia Diária de Campo',        valor: 150, moeda: 'R$'  },
+  { key: 'meia_diaria_deslocamento', label: 'Meia Diária de Deslocamento', valor: 225, moeda: 'R$', tipo: 'toggle' },
+  { key: 'meia_viagem',              label: 'Meia Viagem sem Pernoite',    valor: 225, moeda: 'R$'  },
 ]
 
 function diasEntreDatas(de, ate) {
@@ -33,20 +63,26 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
   const [form, setForm] = useState({
     nome_completo: '', cpf: '', email: '', telefone: '',
     endereco: '', cep: '', data_nascimento: '', complemento_bairro: '', cidade_estado: '',
-    banco: '', agencia: '', conta: '',
-    numero_demanda: '', vigencia_poa: '2025-26', linhas_poa: '', sei: '', componente: '',
+    // Banco
+    banco: '', codigo_banco: '', agencia_numero: '', agencia_digito: '', conta_numero: '', conta_digito: '',
+    // Projeto
+    numero_demanda: '', vigencia_poa: '2025-26', linhas_poa: '', sei: '', componente: '', proc_numero: '',
     unidade_solicitante: '', tem_passagem: 'nao',
     justificativa: '',
+    // Passagem aérea
     passagem_origem_1: '', passagem_destino_1: '',
     passagem_ida_data: '', passagem_ida_hora: '',
     passagem_volta_data: '', passagem_volta_hora: '',
     passagem_valor: '', passagem_bagagem: 'sem despacho de bagagem',
+    // Transporte
     transporte_origem: '', transporte_destino: '',
     transporte_partida_data: '', transporte_chegada_data: '',
     transporte_tipo: 'Veículo Oficial', transporte_valor: '',
+    // Hospedagem
     hospedagem_local: '', hospedagem_entrada: '', hospedagem_saida: '',
     hospedagem_tipo: 'Café da manhã', hospedagem_valor: '',
-    diarias: {},
+    // Diárias (inclui meia_diaria_deslocamento como 'nao'/'sim')
+    diarias: { meia_diaria_deslocamento: 'nao' },
   })
 
   useEffect(() => {
@@ -55,12 +91,15 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
     } else if (perfilUsuario) {
       setForm(prev => ({
         ...prev,
-        nome_completo: perfilUsuario.nome_completo || '',
-        email: perfilUsuario.email || '',
-        telefone: perfilUsuario.telefone || '',
-        banco: perfilUsuario.banco || '',
-        agencia: perfilUsuario.agencia || '',
-        conta: perfilUsuario.conta || '',
+        nome_completo:      perfilUsuario.nome_completo || '',
+        email:              perfilUsuario.email         || '',
+        telefone:           perfilUsuario.telefone      || '',
+        banco:              perfilUsuario.banco         || '',
+        codigo_banco:       perfilUsuario.codigo_banco  || '',
+        agencia_numero:     perfilUsuario.agencia_numero || '',
+        agencia_digito:     perfilUsuario.agencia_digito || '',
+        conta_numero:       perfilUsuario.conta_numero  || '',
+        conta_digito:       perfilUsuario.conta_digito  || '',
         unidade_solicitante: perfilUsuario.unidade?.nome || '',
       }))
     }
@@ -68,18 +107,30 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
 
   const set = (campo, valor) => setForm(f => ({ ...f, [campo]: valor }))
 
+  const setBanco = (nomeBanco) => {
+    const banco = BANCOS_BR.find(b => b.nome === nomeBanco)
+    setForm(f => ({
+      ...f,
+      banco: nomeBanco,
+      codigo_banco: banco && banco.codigo !== 'outro' ? banco.codigo : f.codigo_banco,
+    }))
+  }
+
   const setDiariaRange = (key, campo, valor) => {
     setForm(f => {
       const diarias = { ...f.diarias, [`${key}_${campo}`]: valor }
-      // Calcular dias automaticamente ao mudar as datas
       if (campo === 'de' || campo === 'ate') {
-        const de = campo === 'de' ? valor : (diarias[`${key}_de`] || '')
+        const de  = campo === 'de'  ? valor : (diarias[`${key}_de`]  || '')
         const ate = campo === 'ate' ? valor : (diarias[`${key}_ate`] || '')
         const dias = diasEntreDatas(de, ate)
         if (dias > 0) diarias[`${key}_qtd`] = dias
       }
       return { ...f, diarias }
     })
+  }
+
+  const setDiariaToggle = (key, valor) => {
+    setForm(f => ({ ...f, diarias: { ...f.diarias, [key]: valor } }))
   }
 
   // Auto-preenchimento de CEP
@@ -93,9 +144,9 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
       if (!data.erro) {
         setForm(f => ({
           ...f,
-          endereco: data.logradouro || f.endereco,
-          complemento_bairro: data.bairro || f.complemento_bairro,
-          cidade_estado: `${data.localidade} - ${data.uf}`,
+          endereco:          data.logradouro || f.endereco,
+          complemento_bairro: data.bairro    || f.complemento_bairro,
+          cidade_estado:     `${data.localidade} - ${data.uf}`,
         }))
       }
     } catch {}
@@ -157,7 +208,6 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
   const totalDiarias = calcularTotais(form.diarias || {})
   const totalGeral = totalDiarias + Number(form.passagem_valor || 0) + Number(form.transporte_valor || 0) + Number(form.hospedagem_valor || 0)
 
-  // Abas dinâmicas (sem passagem aérea se não tem passagem)
   const abas = ['Beneficiário', 'Projeto', ...(form.tem_passagem === 'sim' ? ['Passagem Aérea'] : []), 'Transporte', 'Hospedagem', 'Diárias']
 
   return (
@@ -191,7 +241,7 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
 
       <div style={styles.card}>
 
-        {/* ABA — Beneficiário */}
+        {/* ── ABA: Beneficiário ─────────────────────────────────────────────── */}
         {abas[aba] === 'Beneficiário' && (
           <div style={styles.secao}>
             <p style={styles.dica}>💡 Dados pré-preenchidos do seu cadastro. Verifique e ajuste se necessário.</p>
@@ -227,17 +277,61 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
                 <input style={styles.input} value={form.cidade_estado} onChange={e => set('cidade_estado', e.target.value)} placeholder="Ex: Rio Branco - AC" />
               </Campo>
             </div>
+
             <hr style={styles.hr} />
             <h3 style={styles.subtituloSecao}>Dados Bancários</h3>
-            <div style={styles.grid3}>
-              <Campo label="Banco"><input style={styles.input} value={form.banco} onChange={e => set('banco', e.target.value)} /></Campo>
-              <Campo label="Agência"><input style={styles.input} value={form.agencia} onChange={e => set('agencia', e.target.value)} /></Campo>
-              <Campo label="Conta Corrente"><input style={styles.input} value={form.conta} onChange={e => set('conta', e.target.value)} /></Campo>
+
+            {/* Linha 1: Banco + Código COMPE */}
+            <div style={styles.grid2}>
+              <Campo label="Banco *">
+                <select style={styles.input} value={form.banco} onChange={e => setBanco(e.target.value)}>
+                  <option value="">Selecione o banco...</option>
+                  {BANCOS_BR.map(b => (
+                    <option key={b.codigo} value={b.nome}>{b.nome}</option>
+                  ))}
+                </select>
+              </Campo>
+              <Campo label="Código COMPE (preenchido automaticamente)">
+                <input style={{ ...styles.input, background: '#f9fafb' }}
+                  value={form.codigo_banco}
+                  onChange={e => set('codigo_banco', e.target.value)}
+                  placeholder="Ex: 001" />
+              </Campo>
+            </div>
+
+            {/* Linha 2: Agência (número + dígito) e Conta (número + dígito) */}
+            <div style={styles.grid2}>
+              <Campo label="Agência">
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input style={{ ...styles.input, flex: 3 }}
+                    value={form.agencia_numero}
+                    onChange={e => set('agencia_numero', e.target.value)}
+                    placeholder="Número (ex: 5779)" />
+                  <span style={{ color: '#6b7280', fontWeight: '600', fontSize: '16px' }}>-</span>
+                  <input style={{ ...styles.input, flex: 1, textAlign: 'center' }}
+                    value={form.agencia_digito}
+                    onChange={e => set('agencia_digito', e.target.value)}
+                    placeholder="D" maxLength={2} />
+                </div>
+              </Campo>
+              <Campo label="Conta Corrente">
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input style={{ ...styles.input, flex: 3 }}
+                    value={form.conta_numero}
+                    onChange={e => set('conta_numero', e.target.value)}
+                    placeholder="Número (ex: 41096)" />
+                  <span style={{ color: '#6b7280', fontWeight: '600', fontSize: '16px' }}>-</span>
+                  <input style={{ ...styles.input, flex: 1, textAlign: 'center' }}
+                    value={form.conta_digito}
+                    onChange={e => set('conta_digito', e.target.value)}
+                    placeholder="D" maxLength={2} />
+                </div>
+              </Campo>
             </div>
           </div>
         )}
 
-        {/* ABA — Projeto */}
+        {/* ── ABA: Projeto ─────────────────────────────────────────────────── */}
         {abas[aba] === 'Projeto' && (
           <div style={styles.secao}>
             <div style={styles.grid2}>
@@ -259,7 +353,12 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
                 <input style={styles.input} value={form.componente} onChange={e => set('componente', e.target.value)}
                   placeholder="Preenchido automaticamente" />
               </Campo>
-              <Campo label="SEI"><input style={styles.input} value={form.sei} onChange={e => set('sei', e.target.value)} /></Campo>
+              <Campo label="SEI">
+                <input style={styles.input} value={form.sei} onChange={e => set('sei', e.target.value)} placeholder="Número do processo SEI" />
+              </Campo>
+              <Campo label="Processo">
+                <input style={styles.input} value={form.proc_numero} onChange={e => set('proc_numero', e.target.value)} placeholder="Número do processo administrativo" />
+              </Campo>
               <Campo label="Unidade do Solicitante">
                 <input style={styles.input} value={form.unidade_solicitante} onChange={e => set('unidade_solicitante', e.target.value)} />
               </Campo>
@@ -289,7 +388,7 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
           </div>
         )}
 
-        {/* ABA — Passagem Aérea (só aparece se tem_passagem = sim) */}
+        {/* ── ABA: Passagem Aérea ───────────────────────────────────────────── */}
         {abas[aba] === 'Passagem Aérea' && (
           <div style={styles.secao}>
             <h3 style={styles.subtituloSecao}>Trecho de Ida</h3>
@@ -311,7 +410,7 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
           </div>
         )}
 
-        {/* ABA — Transporte */}
+        {/* ── ABA: Transporte ───────────────────────────────────────────────── */}
         {abas[aba] === 'Transporte' && (
           <div style={styles.secao}>
             <div style={styles.grid2}>
@@ -333,7 +432,7 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
           </div>
         )}
 
-        {/* ABA — Hospedagem */}
+        {/* ── ABA: Hospedagem ───────────────────────────────────────────────── */}
         {abas[aba] === 'Hospedagem' && (
           <div style={styles.secao}>
             <div style={styles.grid2}>
@@ -350,7 +449,7 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
           </div>
         )}
 
-        {/* ABA — Diárias */}
+        {/* ── ABA: Diárias ──────────────────────────────────────────────────── */}
         {abas[aba] === 'Diárias' && (
           <div style={styles.secao}>
             <p style={styles.dica}>📅 Selecione o período de cada tipo de diária. A quantidade é calculada automaticamente.</p>
@@ -360,28 +459,67 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
                   <th style={styles.thTabela}>Tipo de Diária</th>
                   <th style={styles.thTabela}>Data Início</th>
                   <th style={styles.thTabela}>Data Fim</th>
-                  <th style={styles.thTabela}>Dias</th>
+                  <th style={styles.thTabela}>Dias / Incidência</th>
                   <th style={styles.thTabela}>Valor Unit.</th>
                   <th style={styles.thTabela}>Total</th>
                 </tr>
               </thead>
               <tbody>
                 {DIARIAS_LISTA.map((d, i) => {
-                  const de = form.diarias?.[`${d.key}_de`] || ''
-                  const ate = form.diarias?.[`${d.key}_ate`] || ''
-                  const qtd = Number(form.diarias?.[`${d.key}_qtd`] || 0)
+                  const isToggle = d.tipo === 'toggle'
+                  const ativo = isToggle
+                    ? form.diarias?.[d.key] === 'sim'
+                    : false
+                  const de   = form.diarias?.[`${d.key}_de`]  || ''
+                  const ate  = form.diarias?.[`${d.key}_ate`] || ''
+                  const qtd  = isToggle ? (ativo ? 1 : 0) : Number(form.diarias?.[`${d.key}_qtd`] || 0)
                   const total = qtd * d.valor
+
                   return (
                     <tr key={d.key} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                      <td style={{ padding: '10px 12px', fontSize: '14px', color: '#374151', minWidth: '180px' }}>{d.label}</td>
-                      <td style={{ padding: '8px' }}>
-                        <input type="date" style={styles.inputData}
-                          value={de} onChange={e => setDiariaRange(d.key, 'de', e.target.value)} />
-                      </td>
-                      <td style={{ padding: '8px' }}>
-                        <input type="date" style={styles.inputData}
-                          value={ate} onChange={e => setDiariaRange(d.key, 'ate', e.target.value)} />
-                      </td>
+                      <td style={{ padding: '10px 12px', fontSize: '14px', color: '#374151', minWidth: '200px' }}>{d.label}</td>
+
+                      {/* Colunas de data — toggle ocupa as duas colunas com botões sim/não */}
+                      {isToggle ? (
+                        <td colSpan={2} style={{ padding: '8px 12px' }}>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => setDiariaToggle(d.key, 'sim')}
+                              style={{
+                                padding: '6px 18px', borderRadius: '6px', border: '1.5px solid',
+                                cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                                background: ativo ? '#1a4731' : 'white',
+                                color: ativo ? 'white' : '#374151',
+                                borderColor: ativo ? '#1a4731' : '#d1d5db',
+                              }}>
+                              Sim
+                            </button>
+                            <button
+                              onClick={() => setDiariaToggle(d.key, 'nao')}
+                              style={{
+                                padding: '6px 18px', borderRadius: '6px', border: '1.5px solid',
+                                cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                                background: !ativo ? '#6b7280' : 'white',
+                                color: !ativo ? 'white' : '#374151',
+                                borderColor: !ativo ? '#6b7280' : '#d1d5db',
+                              }}>
+                              Não
+                            </button>
+                          </div>
+                        </td>
+                      ) : (
+                        <>
+                          <td style={{ padding: '8px' }}>
+                            <input type="date" style={styles.inputData}
+                              value={de} onChange={e => setDiariaRange(d.key, 'de', e.target.value)} />
+                          </td>
+                          <td style={{ padding: '8px' }}>
+                            <input type="date" style={styles.inputData}
+                              value={ate} onChange={e => setDiariaRange(d.key, 'ate', e.target.value)} />
+                          </td>
+                        </>
+                      )}
+
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                         <span style={{
                           display: 'inline-block', padding: '4px 12px', borderRadius: '20px',
@@ -389,7 +527,7 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
                           color: qtd > 0 ? '#166534' : '#9ca3af',
                           fontSize: '13px', fontWeight: '600',
                         }}>
-                          {qtd > 0 ? `${qtd} dia${qtd > 1 ? 's' : ''}` : '—'}
+                          {isToggle ? (ativo ? 'Sim' : 'Não') : (qtd > 0 ? `${qtd} dia${qtd > 1 ? 's' : ''}` : '—')}
                         </span>
                       </td>
                       <td style={{ padding: '10px 12px', fontSize: '13px', color: '#6b7280' }}>
@@ -458,8 +596,7 @@ const styles = {
   card: { background: '#fff', borderRadius: '12px', padding: '28px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', marginBottom: '20px' },
   secao: { display: 'flex', flexDirection: 'column', gap: '16px' },
   grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' },
-  grid3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' },
-  input: { padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '14px', outline: 'none', fontFamily: 'inherit', width: '100%' },
+  input: { padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '14px', outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' },
   inputData: { padding: '7px 10px', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '13px', outline: 'none', fontFamily: 'inherit', width: '140px' },
   hr: { border: 'none', borderTop: '1px solid #e5e7eb', margin: '4px 0' },
   subtituloSecao: { fontSize: '15px', fontWeight: '600', color: '#374151', margin: 0 },
