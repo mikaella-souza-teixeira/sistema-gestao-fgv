@@ -91,6 +91,30 @@ export default function PassagensDiarias({ perfilUsuario }) {
     setProcessando(null)
   }
 
+  const cancelarSolicitacao = async (id) => {
+    if (!confirm('Cancelar esta solicitação?')) return
+    setProcessando(id)
+    await supabase.from('passagens_diarias').update({
+      status: 'cancelado',
+      updated_at: new Date().toISOString(),
+    }).eq('id', id)
+    await carregar()
+    setProcessando(null)
+  }
+
+  const cancelarAprovacao = async (id) => {
+    if (!confirm('Cancelar a aprovação e devolver para "Enviado"?')) return
+    setProcessando(id)
+    await supabase.from('passagens_diarias').update({
+      status: 'enviado',
+      data_aprovacao: null,
+      prazo_prestacao: null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', id)
+    await carregar()
+    setProcessando(null)
+  }
+
   const uploadAnexo = async (id, tipo, arquivo) => {
     setUploadando(`${id}-${tipo}`)
     try {
@@ -233,23 +257,32 @@ export default function PassagensDiarias({ perfilUsuario }) {
                           <button onClick={() => abrirEditar(s)} style={styles.btnAcao} title="Editar">
                             ✏️
                           </button>
+                          {/* Aprovar / Recusar — admin, status enviado */}
                           {isAdmin && s.status === 'enviado' && (
                             <>
-                              <button
-                                onClick={() => aprovar(s.id)}
-                                disabled={processando === s.id}
-                                style={{ ...styles.btnAcaoTexto, background: '#dcfce7', color: '#166534' }}
-                                title="Aprovar">
+                              <button onClick={() => aprovar(s.id)} disabled={processando === s.id}
+                                style={{ ...styles.btnAcaoTexto, background: '#dcfce7', color: '#166534' }}>
                                 {processando === s.id ? '...' : '✓ Aprovar'}
                               </button>
-                              <button
-                                onClick={() => recusar(s.id)}
-                                disabled={processando === s.id}
-                                style={{ ...styles.btnAcaoTexto, background: '#fee2e2', color: '#991b1b' }}
-                                title="Recusar">
+                              <button onClick={() => recusar(s.id)} disabled={processando === s.id}
+                                style={{ ...styles.btnAcaoTexto, background: '#fee2e2', color: '#991b1b' }}>
                                 ✕ Recusar
                               </button>
                             </>
+                          )}
+                          {/* Cancelar solicitação — status enviado */}
+                          {s.status === 'enviado' && (
+                            <button onClick={() => cancelarSolicitacao(s.id)} disabled={processando === s.id}
+                              style={{ ...styles.btnAcaoTexto, background: '#f3f4f6', color: '#6b7280' }}>
+                              🚫 Cancelar
+                            </button>
+                          )}
+                          {/* Cancelar aprovação — admin, status aguardando_prestacao */}
+                          {isAdmin && s.status === 'aguardando_prestacao' && (
+                            <button onClick={() => cancelarAprovacao(s.id)} disabled={processando === s.id}
+                              style={{ ...styles.btnAcaoTexto, background: '#fef3c7', color: '#92400e' }}>
+                              ↩ Cancelar aprovação
+                            </button>
                           )}
                         </div>
                       </td>

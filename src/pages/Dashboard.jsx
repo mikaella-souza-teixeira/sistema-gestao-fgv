@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import Usuarios from './Usuarios'
 import PassagensDiarias from './PassagensDiarias'
+import TDRs from './TDRs'
 
 const modulos = [
   { id: 'passagens', nome: 'Passagens e Diárias', icone: '✈️', descricao: 'Solicitações de passagens aéreas e diárias', cor: '#2d7a4f' },
@@ -175,8 +176,9 @@ export default function Dashboard({ usuario, perfilUsuario }) {
 
           {moduloAtivo === 'usuarios' && isAdmin && <Usuarios />}
           {moduloAtivo === 'passagens' && <PassagensDiarias perfilUsuario={perfilUsuario} />}
+          {moduloAtivo === 'tdrs' && <TDRs perfilUsuario={perfilUsuario} />}
 
-          {modulos.filter(m => m.id !== 'passagens').map(m => moduloAtivo === m.id && (
+          {modulos.filter(m => !['passagens','tdrs'].includes(m.id)).map(m => moduloAtivo === m.id && (
             <div key={m.id} style={styles.moduloArea}>
               <div style={styles.moduloPlaceholder}>
                 <span style={styles.moduloIconeGrande}>{m.icone}</span>
