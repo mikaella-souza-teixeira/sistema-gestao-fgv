@@ -13,7 +13,24 @@ const modulos = [
 export default function Dashboard({ usuario, perfilUsuario }) {
   const [moduloAtivo, setModuloAtivo] = useState(null)
   const [menuAberto, setMenuAberto] = useState(true)
+  const [pendentes, setPendentes] = useState(0)
   const isAdmin = perfilUsuario?.perfil === 'administrador'
+
+  useEffect(() => {
+    if (!isAdmin) return
+    const buscar = async () => {
+      const { count } = await supabase
+        .from('notificacoes')
+        .select('id', { count: 'exact', head: true })
+        .eq('lida', false)
+      setPendentes(count || 0)
+    }
+    buscar()
+    const canal = supabase.channel('notif-dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notificacoes' }, buscar)
+      .subscribe()
+    return () => supabase.removeChannel(canal)
+  }, [isAdmin])
 
   const handleSair = async () => {
     await supabase.auth.signOut()
@@ -59,7 +76,10 @@ export default function Dashboard({ usuario, perfilUsuario }) {
                 color: moduloAtivo === m.id ? '#fff' : '#d1fae5',
               }}>
               <span style={styles.navIcone}>{m.icone}</span>
-              {menuAberto && <span>{m.nome}</span>}
+              {menuAberto && <span style={{ flex: 1 }}>{m.nome}</span>}
+              {menuAberto && m.id === 'passagens' && isAdmin && pendentes > 0 && (
+                <span style={styles.navBadge}>{pendentes}</span>
+              )}
             </button>
           ))}
 
@@ -195,6 +215,7 @@ const styles = {
     fontWeight: '500', textAlign: 'left', transition: 'background 0.2s', whiteSpace: 'nowrap',
   },
   navIcone: { fontSize: '18px', minWidth: '20px' },
+  navBadge: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '20px', borderRadius: '10px', background: '#dc2626', color: 'white', fontSize: '11px', fontWeight: '700', padding: '0 5px' },
   separador: {
     fontSize: '10px', fontWeight: '700', color: 'rgba(255,255,255,0.4)',
     letterSpacing: '1px', padding: '12px 16px 4px', margin: 0,

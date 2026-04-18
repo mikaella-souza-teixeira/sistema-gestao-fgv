@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { gerarDocumentoWord, calcularTotais, formatarMoeda } from '../lib/gerarDocumento'
 
-// ─── Lista de bancos brasileiros com código COMPE ────────────────────────────
 const BANCOS_BR = [
   { codigo: '001', nome: 'Banco do Brasil' },
   { codigo: '033', nome: 'Santander' },
@@ -31,7 +30,6 @@ const BANCOS_BR = [
   { codigo: 'outro', nome: 'Outro' },
 ]
 
-// ─── Tipos de diárias ─────────────────────────────────────────────────────────
 const DIARIAS_LISTA = [
   { key: 'diaria_intl',              label: 'Diária Internacional',        valor: 400, moeda: 'US$' },
   { key: 'meia_diaria_intl',         label: 'Meia Diária Internacional',   valor: 200, moeda: 'US$' },
@@ -45,6 +43,13 @@ const DIARIAS_LISTA = [
   { key: 'meia_viagem',              label: 'Meia Viagem sem Pernoite',    valor: 225, moeda: 'R$'  },
 ]
 
+const VIAJANTE_VAZIO = {
+  nome_completo: '', cpf: '', email: '', telefone: '', data_nascimento: '',
+  endereco: '', cep: '', complemento_bairro: '', cidade_estado: '',
+  banco: '', codigo_banco: '', agencia_numero: '', agencia_digito: '',
+  conta_numero: '', conta_digito: '',
+}
+
 function diasEntreDatas(de, ate) {
   if (!de || !ate) return 0
   const diff = new Date(ate) - new Date(de)
@@ -54,6 +59,7 @@ function diasEntreDatas(de, ate) {
 export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, onSalvar }) {
   const isEdicao = !!solicitacao
   const [aba, setAba] = useState(0)
+  const [viajanteSel, setViajanteSel] = useState(0)
   const [salvando, setSalvando] = useState(false)
   const [gerando, setGerando] = useState(false)
   const [erro, setErro] = useState('')
@@ -61,13 +67,11 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
   const [buscandoDemanda, setBuscandoDemanda] = useState(false)
 
   const [form, setForm] = useState({
-    nome_completo: '', cpf: '', email: '', telefone: '',
-    endereco: '', cep: '', data_nascimento: '', complemento_bairro: '', cidade_estado: '',
-    // Banco
-    banco: '', codigo_banco: '', agencia_numero: '', agencia_digito: '', conta_numero: '', conta_digito: '',
+    // Viajantes (lista de beneficiários)
+    beneficiarios: [{ ...VIAJANTE_VAZIO }],
     // Projeto
-    numero_demanda: '', vigencia_poa: '2025-26', linhas_poa: '', sei: '', componente: '', proc_numero: '',
-    unidade_solicitante: '', tem_passagem: 'nao',
+    numero_demanda: '', vigencia_poa: '2025-26', linhas_poa: '', sei: '',
+    componente: '', proc_numero: '', unidade_solicitante: '', tem_passagem: 'nao',
     justificativa: '',
     // Passagem aérea
     passagem_origem_1: '', passagem_destino_1: '',
@@ -81,39 +85,83 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
     // Hospedagem
     hospedagem_local: '', hospedagem_entrada: '', hospedagem_saida: '',
     hospedagem_tipo: 'Café da manhã', hospedagem_valor: '',
-    // Diárias (inclui meia_diaria_deslocamento como 'nao'/'sim')
+    // Diárias
     diarias: { meia_diaria_deslocamento: 'nao' },
   })
 
   useEffect(() => {
     if (isEdicao && solicitacao.dados) {
-      setForm(prev => ({ ...prev, ...solicitacao.dados }))
+      const d = solicitacao.dados
+      // Compatibilidade: solicitações antigas têm campos planos, não array
+      if (d.beneficiarios) {
+        setForm(prev => ({ ...prev, ...d }))
+      } else {
+        const { nome_completo, cpf, email, telefone, data_nascimento,
+          endereco, cep, complemento_bairro, cidade_estado,
+          banco, codigo_banco, agencia_numero, agencia_digito,
+          conta_numero, conta_digito, ...resto } = d
+        setForm(prev => ({
+          ...prev, ...resto,
+          beneficiarios: [{ nome_completo, cpf, email, telefone, data_nascimento,
+            endereco, cep, complemento_bairro, cidade_estado,
+            banco, codigo_banco, agencia_numero, agencia_digito,
+            conta_numero, conta_digito }],
+        }))
+      }
     } else if (perfilUsuario) {
       setForm(prev => ({
         ...prev,
-        nome_completo:      perfilUsuario.nome_completo || '',
-        email:              perfilUsuario.email         || '',
-        telefone:           perfilUsuario.telefone      || '',
-        banco:              perfilUsuario.banco         || '',
-        codigo_banco:       perfilUsuario.codigo_banco  || '',
-        agencia_numero:     perfilUsuario.agencia_numero || '',
-        agencia_digito:     perfilUsuario.agencia_digito || '',
-        conta_numero:       perfilUsuario.conta_numero  || '',
-        conta_digito:       perfilUsuario.conta_digito  || '',
         unidade_solicitante: perfilUsuario.unidade?.nome || '',
+        beneficiarios: [{
+          nome_completo:      perfilUsuario.nome_completo  || '',
+          email:              perfilUsuario.email          || '',
+          telefone:           perfilUsuario.telefone       || '',
+          banco:              perfilUsuario.banco          || '',
+          codigo_banco:       perfilUsuario.codigo_banco   || '',
+          agencia_numero:     perfilUsuario.agencia_numero || '',
+          agencia_digito:     perfilUsuario.agencia_digito || '',
+          conta_numero:       perfilUsuario.conta_numero   || '',
+          conta_digito:       perfilUsuario.conta_digito   || '',
+          cpf: '', data_nascimento: '', endereco: '', cep: '',
+          complemento_bairro: '', cidade_estado: '',
+        }],
       }))
     }
   }, [isEdicao, solicitacao, perfilUsuario])
 
   const set = (campo, valor) => setForm(f => ({ ...f, [campo]: valor }))
 
-  const setBanco = (nomeBanco) => {
+  const setViajante = (idx, campo, valor) => {
+    setForm(f => {
+      const beneficiarios = f.beneficiarios.map((b, i) =>
+        i === idx ? { ...b, [campo]: valor } : b
+      )
+      return { ...f, beneficiarios }
+    })
+  }
+
+  const setBancoViajante = (idx, nomeBanco) => {
     const banco = BANCOS_BR.find(b => b.nome === nomeBanco)
-    setForm(f => ({
-      ...f,
-      banco: nomeBanco,
-      codigo_banco: banco && banco.codigo !== 'outro' ? banco.codigo : f.codigo_banco,
-    }))
+    setForm(f => {
+      const beneficiarios = f.beneficiarios.map((b, i) =>
+        i === idx ? {
+          ...b, banco: nomeBanco,
+          codigo_banco: banco && banco.codigo !== 'outro' ? banco.codigo : b.codigo_banco,
+        } : b
+      )
+      return { ...f, beneficiarios }
+    })
+  }
+
+  const adicionarViajante = () => {
+    setForm(f => ({ ...f, beneficiarios: [...f.beneficiarios, { ...VIAJANTE_VAZIO }] }))
+    setViajanteSel(form.beneficiarios.length)
+  }
+
+  const removerViajante = (idx) => {
+    if (form.beneficiarios.length <= 1) return
+    setForm(f => ({ ...f, beneficiarios: f.beneficiarios.filter((_, i) => i !== idx) }))
+    setViajanteSel(prev => Math.min(prev, form.beneficiarios.length - 2))
   }
 
   const setDiariaRange = (key, campo, valor) => {
@@ -133,8 +181,7 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
     setForm(f => ({ ...f, diarias: { ...f.diarias, [key]: valor } }))
   }
 
-  // Auto-preenchimento de CEP
-  const buscarCep = useCallback(async (cep) => {
+  const buscarCep = useCallback(async (cep, idx) => {
     const cepLimpo = cep.replace(/\D/g, '')
     if (cepLimpo.length !== 8) return
     setBuscandoCep(true)
@@ -142,18 +189,22 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
       const res = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
       const data = await res.json()
       if (!data.erro) {
-        setForm(f => ({
-          ...f,
-          endereco:          data.logradouro || f.endereco,
-          complemento_bairro: data.bairro    || f.complemento_bairro,
-          cidade_estado:     `${data.localidade} - ${data.uf}`,
-        }))
+        setForm(f => {
+          const beneficiarios = f.beneficiarios.map((b, i) =>
+            i === idx ? {
+              ...b,
+              endereco:           data.logradouro || b.endereco,
+              complemento_bairro: data.bairro     || b.complemento_bairro,
+              cidade_estado:      `${data.localidade} - ${data.uf}`,
+            } : b
+          )
+          return { ...f, beneficiarios }
+        })
       }
     } catch {}
     setBuscandoCep(false)
   }, [])
 
-  // Auto-preenchimento de Linha POA e Componente pela demanda
   const buscarDemanda = useCallback(async (id) => {
     if (!id || id.length < 10) return
     setBuscandoDemanda(true)
@@ -197,9 +248,20 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
       if (isEdicao) {
         await supabase.from('passagens_diarias').update(payload).eq('id', solicitacao.id)
       } else {
-        await supabase.from('passagens_diarias').insert(payload)
+        const { data: inserted } = await supabase.from('passagens_diarias').insert(payload).select('id').single()
+        // Notificar admin
+        if (inserted) {
+          await supabase.from('notificacoes').insert({
+            tipo: 'nova_solicitacao',
+            referencia_id: inserted.id,
+            mensagem: `Nova solicitação de ${form.beneficiarios[0]?.nome_completo || 'viajante'} — ${form.beneficiarios.length} viajante(s)`,
+          })
+        }
       }
-      await gerarDocumentoWord(form)
+      // Gerar um Word por viajante
+      for (const beneficiario of form.beneficiarios) {
+        await gerarDocumentoWord({ ...form, ...beneficiario })
+      }
       onSalvar()
     } catch (e) { setErro(`Erro ao gerar documento: ${e.message}`) }
     setGerando(false)
@@ -208,7 +270,8 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
   const totalDiarias = calcularTotais(form.diarias || {})
   const totalGeral = totalDiarias + Number(form.passagem_valor || 0) + Number(form.transporte_valor || 0) + Number(form.hospedagem_valor || 0)
 
-  const abas = ['Beneficiário', 'Projeto', ...(form.tem_passagem === 'sim' ? ['Passagem Aérea'] : []), 'Transporte', 'Hospedagem', 'Diárias']
+  const abas = ['Viajantes', 'Projeto', ...(form.tem_passagem === 'sim' ? ['Passagem Aérea'] : []), 'Transporte', 'Hospedagem', 'Diárias']
+  const v = form.beneficiarios[viajanteSel] || VIAJANTE_VAZIO
 
   return (
     <div>
@@ -220,14 +283,13 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
             {salvando ? 'Salvando...' : '💾 Salvar Rascunho'}
           </button>
           <button onClick={gerarDoc} disabled={gerando} style={styles.btnGerar}>
-            {gerando ? 'Gerando...' : '📄 Gerar Documento Word'}
+            {gerando ? 'Gerando...' : '📄 Gerar Documento(s) Word'}
           </button>
         </div>
       </div>
 
       {erro && <div style={styles.erro}>{erro}</div>}
 
-      {/* Abas */}
       <div style={styles.abas}>
         {abas.map((a, i) => (
           <button key={i} onClick={() => setAba(i)} style={{
@@ -241,50 +303,99 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
 
       <div style={styles.card}>
 
-        {/* ── ABA: Beneficiário ─────────────────────────────────────────────── */}
-        {abas[aba] === 'Beneficiário' && (
+        {/* ── ABA: Viajantes ─────────────────────────────────────────────────── */}
+        {abas[aba] === 'Viajantes' && (
           <div style={styles.secao}>
-            <p style={styles.dica}>💡 Dados pré-preenchidos do seu cadastro. Verifique e ajuste se necessário.</p>
+            {/* Lista de viajantes */}
+            <div style={styles.viajantesBarra}>
+              <span style={styles.viajantesTitulo}>
+                {form.beneficiarios.length} viajante{form.beneficiarios.length > 1 ? 's' : ''} nesta solicitação
+              </span>
+              <button onClick={adicionarViajante} style={styles.btnAdicionarViajante}>
+                + Adicionar Viajante
+              </button>
+            </div>
+
+            <div style={styles.viajantesLista}>
+              {form.beneficiarios.map((b, idx) => (
+                <div key={idx} onClick={() => setViajanteSel(idx)}
+                  style={{
+                    ...styles.viajanteCard,
+                    border: viajanteSel === idx ? '2px solid #1a4731' : '2px solid #e5e7eb',
+                    background: viajanteSel === idx ? '#f0fdf4' : '#fff',
+                  }}>
+                  <div style={styles.viajanteAvatar}>
+                    {(b.nome_completo || '?').charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={styles.viajanteNome}>{b.nome_completo || 'Sem nome'}</p>
+                    <p style={styles.viajanteEmail}>{b.email || '—'}</p>
+                  </div>
+                  {form.beneficiarios.length > 1 && (
+                    <button onClick={e => { e.stopPropagation(); removerViajante(idx) }}
+                      style={styles.btnRemoverViajante} title="Remover viajante">✕</button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <hr style={styles.hr} />
+            <h3 style={styles.subtituloSecao}>
+              Dados de: {v.nome_completo || `Viajante ${viajanteSel + 1}`}
+            </h3>
+            <p style={styles.dica}>💡 Dados pré-preenchidos do cadastro. Verifique e ajuste se necessário.</p>
+
             <div style={styles.grid2}>
               <Campo label="Nome Completo *">
-                <input style={styles.input} value={form.nome_completo} onChange={e => set('nome_completo', e.target.value)} />
+                <input style={styles.input} value={v.nome_completo}
+                  onChange={e => setViajante(viajanteSel, 'nome_completo', e.target.value)} />
               </Campo>
               <Campo label="CPF">
-                <input style={styles.input} value={form.cpf} onChange={e => set('cpf', e.target.value)} placeholder="XX.XXX.XXX-XX" />
+                <input style={styles.input} value={v.cpf}
+                  onChange={e => setViajante(viajanteSel, 'cpf', e.target.value)}
+                  placeholder="XX.XXX.XXX-XX" />
               </Campo>
               <Campo label="E-mail">
-                <input style={styles.input} value={form.email} onChange={e => set('email', e.target.value)} />
+                <input style={styles.input} value={v.email}
+                  onChange={e => setViajante(viajanteSel, 'email', e.target.value)} />
               </Campo>
               <Campo label="Telefone">
-                <input style={styles.input} value={form.telefone} onChange={e => set('telefone', e.target.value)} placeholder="(XX) X XXXX-XXXX" />
+                <input style={styles.input} value={v.telefone}
+                  onChange={e => setViajante(viajanteSel, 'telefone', e.target.value)}
+                  placeholder="(XX) X XXXX-XXXX" />
               </Campo>
               <Campo label="Data de Nascimento">
-                <input style={styles.input} type="date" value={form.data_nascimento} onChange={e => set('data_nascimento', e.target.value)} />
+                <input style={styles.input} type="date" value={v.data_nascimento}
+                  onChange={e => setViajante(viajanteSel, 'data_nascimento', e.target.value)} />
               </Campo>
               <Campo label={buscandoCep ? 'CEP  🔄 Buscando...' : 'CEP'}>
-                <input style={styles.input} value={form.cep}
-                  onChange={e => set('cep', e.target.value)}
-                  onBlur={e => buscarCep(e.target.value)}
+                <input style={styles.input} value={v.cep}
+                  onChange={e => setViajante(viajanteSel, 'cep', e.target.value)}
+                  onBlur={e => buscarCep(e.target.value, viajanteSel)}
                   placeholder="XXXXX-XXX" />
               </Campo>
               <Campo label="Endereço Completo">
-                <input style={styles.input} value={form.endereco} onChange={e => set('endereco', e.target.value)} />
+                <input style={styles.input} value={v.endereco}
+                  onChange={e => setViajante(viajanteSel, 'endereco', e.target.value)} />
               </Campo>
               <Campo label="Complemento e Bairro">
-                <input style={styles.input} value={form.complemento_bairro} onChange={e => set('complemento_bairro', e.target.value)} />
+                <input style={styles.input} value={v.complemento_bairro}
+                  onChange={e => setViajante(viajanteSel, 'complemento_bairro', e.target.value)} />
               </Campo>
               <Campo label="Cidade e Estado">
-                <input style={styles.input} value={form.cidade_estado} onChange={e => set('cidade_estado', e.target.value)} placeholder="Ex: Rio Branco - AC" />
+                <input style={styles.input} value={v.cidade_estado}
+                  onChange={e => setViajante(viajanteSel, 'cidade_estado', e.target.value)}
+                  placeholder="Ex: Rio Branco - AC" />
               </Campo>
             </div>
 
             <hr style={styles.hr} />
             <h3 style={styles.subtituloSecao}>Dados Bancários</h3>
 
-            {/* Linha 1: Banco + Código COMPE */}
             <div style={styles.grid2}>
               <Campo label="Banco *">
-                <select style={styles.input} value={form.banco} onChange={e => setBanco(e.target.value)}>
+                <select style={styles.input} value={v.banco}
+                  onChange={e => setBancoViajante(viajanteSel, e.target.value)}>
                   <option value="">Selecione o banco...</option>
                   {BANCOS_BR.map(b => (
                     <option key={b.codigo} value={b.nome}>{b.nome}</option>
@@ -293,37 +404,31 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
               </Campo>
               <Campo label="Código COMPE (preenchido automaticamente)">
                 <input style={{ ...styles.input, background: '#f9fafb' }}
-                  value={form.codigo_banco}
-                  onChange={e => set('codigo_banco', e.target.value)}
+                  value={v.codigo_banco}
+                  onChange={e => setViajante(viajanteSel, 'codigo_banco', e.target.value)}
                   placeholder="Ex: 001" />
               </Campo>
             </div>
-
-            {/* Linha 2: Agência (número + dígito) e Conta (número + dígito) */}
             <div style={styles.grid2}>
               <Campo label="Agência">
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <input style={{ ...styles.input, flex: 3 }}
-                    value={form.agencia_numero}
-                    onChange={e => set('agencia_numero', e.target.value)}
-                    placeholder="Número (ex: 5779)" />
+                  <input style={{ ...styles.input, flex: 3 }} value={v.agencia_numero}
+                    onChange={e => setViajante(viajanteSel, 'agencia_numero', e.target.value)}
+                    placeholder="Número" />
                   <span style={{ color: '#6b7280', fontWeight: '600', fontSize: '16px' }}>-</span>
-                  <input style={{ ...styles.input, flex: 1, textAlign: 'center' }}
-                    value={form.agencia_digito}
-                    onChange={e => set('agencia_digito', e.target.value)}
+                  <input style={{ ...styles.input, flex: 1, textAlign: 'center' }} value={v.agencia_digito}
+                    onChange={e => setViajante(viajanteSel, 'agencia_digito', e.target.value)}
                     placeholder="D" maxLength={2} />
                 </div>
               </Campo>
               <Campo label="Conta Corrente">
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <input style={{ ...styles.input, flex: 3 }}
-                    value={form.conta_numero}
-                    onChange={e => set('conta_numero', e.target.value)}
-                    placeholder="Número (ex: 41096)" />
+                  <input style={{ ...styles.input, flex: 3 }} value={v.conta_numero}
+                    onChange={e => setViajante(viajanteSel, 'conta_numero', e.target.value)}
+                    placeholder="Número" />
                   <span style={{ color: '#6b7280', fontWeight: '600', fontSize: '16px' }}>-</span>
-                  <input style={{ ...styles.input, flex: 1, textAlign: 'center' }}
-                    value={form.conta_digito}
-                    onChange={e => set('conta_digito', e.target.value)}
+                  <input style={{ ...styles.input, flex: 1, textAlign: 'center' }} value={v.conta_digito}
+                    onChange={e => setViajante(viajanteSel, 'conta_digito', e.target.value)}
                     placeholder="D" maxLength={2} />
                 </div>
               </Campo>
@@ -346,21 +451,25 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
                   value={form.vigencia_poa} readOnly />
               </Campo>
               <Campo label="Linha(s) do POA">
-                <input style={styles.input} value={form.linhas_poa} onChange={e => set('linhas_poa', e.target.value)}
+                <input style={styles.input} value={form.linhas_poa}
+                  onChange={e => set('linhas_poa', e.target.value)}
                   placeholder="Preenchido automaticamente pelo número da demanda" />
               </Campo>
               <Campo label="Componente">
-                <input style={styles.input} value={form.componente} onChange={e => set('componente', e.target.value)}
-                  placeholder="Preenchido automaticamente" />
+                <input style={styles.input} value={form.componente}
+                  onChange={e => set('componente', e.target.value)} placeholder="Preenchido automaticamente" />
               </Campo>
               <Campo label="SEI">
-                <input style={styles.input} value={form.sei} onChange={e => set('sei', e.target.value)} placeholder="Número do processo SEI" />
+                <input style={styles.input} value={form.sei}
+                  onChange={e => set('sei', e.target.value)} placeholder="Número do processo SEI" />
               </Campo>
               <Campo label="Processo">
-                <input style={styles.input} value={form.proc_numero} onChange={e => set('proc_numero', e.target.value)} placeholder="Número do processo administrativo" />
+                <input style={styles.input} value={form.proc_numero}
+                  onChange={e => set('proc_numero', e.target.value)} placeholder="Número do processo administrativo" />
               </Campo>
               <Campo label="Unidade do Solicitante">
-                <input style={styles.input} value={form.unidade_solicitante} onChange={e => set('unidade_solicitante', e.target.value)} />
+                <input style={styles.input} value={form.unidade_solicitante}
+                  onChange={e => set('unidade_solicitante', e.target.value)} />
               </Campo>
             </div>
 
@@ -459,7 +568,7 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
                   <th style={styles.thTabela}>Tipo de Diária</th>
                   <th style={styles.thTabela}>Data Início</th>
                   <th style={styles.thTabela}>Data Fim</th>
-                  <th style={styles.thTabela}>Dias / Incidência</th>
+                  <th style={styles.thTabela}>Quantidade</th>
                   <th style={styles.thTabela}>Valor Unit.</th>
                   <th style={styles.thTabela}>Total</th>
                 </tr>
@@ -467,42 +576,25 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
               <tbody>
                 {DIARIAS_LISTA.map((d, i) => {
                   const isToggle = d.tipo === 'toggle'
-                  const ativo = isToggle
-                    ? form.diarias?.[d.key] === 'sim'
-                    : false
-                  const de   = form.diarias?.[`${d.key}_de`]  || ''
-                  const ate  = form.diarias?.[`${d.key}_ate`] || ''
-                  const qtd  = isToggle ? (ativo ? 1 : 0) : Number(form.diarias?.[`${d.key}_qtd`] || 0)
+                  const ativo = isToggle ? form.diarias?.[d.key] === 'sim' : false
+                  const de  = form.diarias?.[`${d.key}_de`]  || ''
+                  const ate = form.diarias?.[`${d.key}_ate`] || ''
+                  const qtd = isToggle ? (ativo ? 1 : 0) : Number(form.diarias?.[`${d.key}_qtd`] || 0)
                   const total = qtd * d.valor
 
                   return (
                     <tr key={d.key} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                       <td style={{ padding: '10px 12px', fontSize: '14px', color: '#374151', minWidth: '200px' }}>{d.label}</td>
 
-                      {/* Colunas de data — toggle ocupa as duas colunas com botões sim/não */}
                       {isToggle ? (
                         <td colSpan={2} style={{ padding: '8px 12px' }}>
                           <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                              onClick={() => setDiariaToggle(d.key, 'sim')}
-                              style={{
-                                padding: '6px 18px', borderRadius: '6px', border: '1.5px solid',
-                                cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-                                background: ativo ? '#1a4731' : 'white',
-                                color: ativo ? 'white' : '#374151',
-                                borderColor: ativo ? '#1a4731' : '#d1d5db',
-                              }}>
+                            <button onClick={() => setDiariaToggle(d.key, 'sim')}
+                              style={{ padding: '6px 18px', borderRadius: '6px', border: '1.5px solid', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: ativo ? '#1a4731' : 'white', color: ativo ? 'white' : '#374151', borderColor: ativo ? '#1a4731' : '#d1d5db' }}>
                               Sim
                             </button>
-                            <button
-                              onClick={() => setDiariaToggle(d.key, 'nao')}
-                              style={{
-                                padding: '6px 18px', borderRadius: '6px', border: '1.5px solid',
-                                cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-                                background: !ativo ? '#6b7280' : 'white',
-                                color: !ativo ? 'white' : '#374151',
-                                borderColor: !ativo ? '#6b7280' : '#d1d5db',
-                              }}>
+                            <button onClick={() => setDiariaToggle(d.key, 'nao')}
+                              style={{ padding: '6px 18px', borderRadius: '6px', border: '1.5px solid', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: !ativo ? '#6b7280' : 'white', color: !ativo ? 'white' : '#374151', borderColor: !ativo ? '#6b7280' : '#d1d5db' }}>
                               Não
                             </button>
                           </div>
@@ -521,12 +613,7 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
                       )}
 
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                        <span style={{
-                          display: 'inline-block', padding: '4px 12px', borderRadius: '20px',
-                          background: qtd > 0 ? '#dcfce7' : '#f3f4f6',
-                          color: qtd > 0 ? '#166534' : '#9ca3af',
-                          fontSize: '13px', fontWeight: '600',
-                        }}>
+                        <span style={{ display: 'inline-block', padding: '4px 12px', borderRadius: '20px', background: qtd > 0 ? '#dcfce7' : '#f3f4f6', color: qtd > 0 ? '#166534' : '#9ca3af', fontSize: '13px', fontWeight: '600' }}>
                           {isToggle ? (ativo ? 'Sim' : 'Não') : (qtd > 0 ? `${qtd} dia${qtd > 1 ? 's' : ''}` : '—')}
                         </span>
                       </td>
@@ -542,7 +629,6 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
               </tbody>
             </table>
 
-            {/* Resumo financeiro */}
             <div style={styles.resumo}>
               {form.tem_passagem === 'sim' && (
                 <div style={styles.resumoLinha}><span>Passagem aérea</span><span>R$ {formatarMoeda(Number(form.passagem_valor || 0))}</span></div>
@@ -551,21 +637,20 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
               <div style={styles.resumoLinha}><span>Hospedagem</span><span>R$ {formatarMoeda(Number(form.hospedagem_valor || 0))}</span></div>
               <div style={styles.resumoLinha}><span>Diárias</span><span>R$ {formatarMoeda(totalDiarias)}</span></div>
               <div style={{ ...styles.resumoLinha, ...styles.resumoTotal }}>
-                <span>TOTAL GERAL</span><span>R$ {formatarMoeda(totalGeral)}</span>
+                <span>TOTAL GERAL (por viajante)</span><span>R$ {formatarMoeda(totalGeral)}</span>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Navegação */}
       <div style={styles.navegacao}>
         {aba > 0 && <button onClick={() => setAba(a => a - 1)} style={styles.btnNav}>← Anterior</button>}
         <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
           {aba < abas.length - 1 && <button onClick={() => setAba(a => a + 1)} style={styles.btnNavPrimario}>Próximo →</button>}
           {aba === abas.length - 1 && (
             <button onClick={gerarDoc} disabled={gerando} style={styles.btnGerar}>
-              {gerando ? 'Gerando...' : '📄 Gerar Documento Word'}
+              {gerando ? 'Gerando...' : '📄 Gerar Documento(s) Word'}
             </button>
           )}
         </div>
@@ -611,4 +696,13 @@ const styles = {
   navegacao: { display: 'flex', justifyContent: 'space-between', gap: '12px' },
   btnNav: { padding: '10px 20px', borderRadius: '8px', border: '1.5px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '14px' },
   btnNavPrimario: { padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#1a4731', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600' },
+  viajantesBarra: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  viajantesTitulo: { fontSize: '14px', fontWeight: '600', color: '#374151' },
+  btnAdicionarViajante: { padding: '8px 16px', borderRadius: '8px', border: '1.5px solid #1a4731', background: 'white', color: '#1a4731', cursor: 'pointer', fontSize: '13px', fontWeight: '600' },
+  viajantesLista: { display: 'flex', gap: '10px', flexWrap: 'wrap' },
+  viajanteCard: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', cursor: 'pointer', transition: 'all 0.15s', minWidth: '180px', flex: '1 1 180px', maxWidth: '260px' },
+  viajanteAvatar: { width: '36px', height: '36px', borderRadius: '50%', background: '#1a4731', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700', flexShrink: 0 },
+  viajanteNome: { fontSize: '13px', fontWeight: '600', color: '#111827', margin: '0 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  viajanteEmail: { fontSize: '12px', color: '#6b7280', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  btnRemoverViajante: { background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px', padding: '2px 4px', flexShrink: 0 },
 }

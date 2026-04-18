@@ -67,14 +67,18 @@ export async function gerarDocumentoWord(dados) {
     if (d.tipo === 'toggle') {
       const ativo = diarias[d.key] === 'sim'
       totalDiarias += ativo ? d.valor : 0
-      valoresDiarias[`val_${d.key}`] = ativo ? fmt(d.valor, d.moeda) : ''
-      valoresDiarias[`qtd_${d.key}`] = ativo ? '1' : ''
+      valoresDiarias[`val_${d.key}`]  = ativo ? fmt(d.valor, d.moeda) : ''
+      valoresDiarias[`qtd_${d.key}`]  = ativo ? '1' : ''
+      valoresDiarias[`dias_${d.key}`] = ''
     } else {
       const qtd   = Number(diarias[`${d.key}_qtd`] || 0)
       const total = qtd * d.valor
+      const de    = diarias[`${d.key}_de`]  || ''
+      const ate   = diarias[`${d.key}_ate`] || ''
       totalDiarias += total
-      valoresDiarias[`val_${d.key}`] = qtd > 0 ? fmt(total, d.moeda) : ''
-      valoresDiarias[`qtd_${d.key}`] = qtd > 0 ? String(qtd) : ''
+      valoresDiarias[`val_${d.key}`]  = qtd > 0 ? fmt(total, d.moeda) : ''
+      valoresDiarias[`qtd_${d.key}`]  = qtd > 0 ? String(qtd) : ''
+      valoresDiarias[`dias_${d.key}`] = (de && ate) ? `${fmtData(de)} – ${fmtData(ate)}` : ''
     }
   }
 
