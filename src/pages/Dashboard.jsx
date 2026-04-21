@@ -5,6 +5,7 @@ import PassagensDiarias from './PassagensDiarias'
 import TDRs from './TDRs'
 import Aquisicoes from './Aquisicoes'
 import Financeiro from './Financeiro'
+import Relatorios from './Relatorios'
 
 // ── Painel de Execução (tela inicial) ────────────────────────────────────────
 function PainelExecucao({ setModuloAtivo }) {
@@ -226,10 +227,11 @@ const ep = {
 }
 
 const modulos = [
-  { id: 'passagens', nome: 'Passagens e Diárias', icone: '✈️', descricao: 'Solicitações de passagens aéreas e diárias', cor: '#2d7a4f' },
-  { id: 'tdrs', nome: 'TDRs', icone: '📄', descricao: 'Termos de Referência', cor: '#1d4ed8' },
-  { id: 'aquisicoes', nome: 'Aquisições', icone: '🛒', descricao: 'Processos de aquisição', cor: '#b45309' },
-  { id: 'financeiro', nome: 'Financeiro', icone: '💰', descricao: 'Orçamento e execução financeira', cor: '#7c3aed' },
+  { id: 'passagens',  nome: 'Passagens e Diárias', icone: '✈️', descricao: 'Solicitações de passagens aéreas e diárias', cor: '#2d7a4f' },
+  { id: 'tdrs',       nome: 'TDRs',                icone: '📄', descricao: 'Termos de Referência',                        cor: '#1d4ed8' },
+  { id: 'aquisicoes', nome: 'Aquisições',           icone: '🛒', descricao: 'Processos de aquisição',                      cor: '#b45309' },
+  { id: 'financeiro', nome: 'Financeiro',           icone: '💰', descricao: 'Orçamento e execução financeira',             cor: '#7c3aed' },
+  { id: 'relatorios', nome: 'Relatórios',           icone: '📊', descricao: 'Exportar e imprimir relatórios',              cor: '#0f766e' },
 ]
 
 export default function Dashboard({ usuario, perfilUsuario }) {
@@ -377,9 +379,10 @@ export default function Dashboard({ usuario, perfilUsuario }) {
           {moduloAtivo === 'passagens' && <PassagensDiarias perfilUsuario={perfilUsuario} />}
           {moduloAtivo === 'tdrs' && <TDRs perfilUsuario={perfilUsuario} />}
           {moduloAtivo === 'aquisicoes' && <Aquisicoes perfilUsuario={perfilUsuario} />}
-          {moduloAtivo === 'financeiro' && <Financeiro perfilUsuario={perfilUsuario} />}
+          {moduloAtivo === 'financeiro'  && <Financeiro  perfilUsuario={perfilUsuario} />}
+          {moduloAtivo === 'relatorios' && <Relatorios  perfilUsuario={perfilUsuario} />}
 
-          {modulos.filter(m => !['passagens','tdrs','aquisicoes','financeiro'].includes(m.id)).map(m => moduloAtivo === m.id && (
+          {modulos.filter(m => !['passagens','tdrs','aquisicoes','financeiro','relatorios'].includes(m.id)).map(m => moduloAtivo === m.id && (
             <div key={m.id} style={styles.moduloArea}>
               <div style={styles.moduloPlaceholder}>
                 <span style={styles.moduloIconeGrande}>{m.icone}</span>
