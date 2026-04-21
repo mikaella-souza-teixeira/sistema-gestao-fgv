@@ -6,6 +6,7 @@ import TDRs from './TDRs'
 import Aquisicoes from './Aquisicoes'
 import Financeiro from './Financeiro'
 import Relatorios from './Relatorios'
+import MapaAtuacao from './MapaAtuacao'
 
 // ── Painel de Execução (tela inicial) ────────────────────────────────────────
 function PainelExecucao({ setModuloAtivo }) {
@@ -231,7 +232,8 @@ const modulos = [
   { id: 'tdrs',       nome: 'TDRs',                icone: '📄', descricao: 'Termos de Referência',                        cor: '#1d4ed8' },
   { id: 'aquisicoes', nome: 'Aquisições',           icone: '🛒', descricao: 'Processos de aquisição',                      cor: '#b45309' },
   { id: 'financeiro', nome: 'Financeiro',           icone: '💰', descricao: 'Orçamento e execução financeira',             cor: '#7c3aed' },
-  { id: 'relatorios', nome: 'Relatórios',           icone: '📊', descricao: 'Exportar e imprimir relatórios',              cor: '#0f766e' },
+  { id: 'relatorios', nome: 'Relatórios',      icone: '📊', descricao: 'Exportar e imprimir relatórios',   cor: '#0f766e' },
+  { id: 'mapa',       nome: 'Mapa de Atuação', icone: '🗺️', descricao: 'Visualização geográfica de shapefiles', cor: '#0369a1' },
 ]
 
 export default function Dashboard({ usuario, perfilUsuario }) {
@@ -381,8 +383,9 @@ export default function Dashboard({ usuario, perfilUsuario }) {
           {moduloAtivo === 'aquisicoes' && <Aquisicoes perfilUsuario={perfilUsuario} />}
           {moduloAtivo === 'financeiro'  && <Financeiro  perfilUsuario={perfilUsuario} />}
           {moduloAtivo === 'relatorios' && <Relatorios  perfilUsuario={perfilUsuario} />}
+          {moduloAtivo === 'mapa'       && <MapaAtuacao perfilUsuario={perfilUsuario} />}
 
-          {modulos.filter(m => !['passagens','tdrs','aquisicoes','financeiro','relatorios'].includes(m.id)).map(m => moduloAtivo === m.id && (
+          {modulos.filter(m => !['passagens','tdrs','aquisicoes','financeiro','relatorios','mapa'].includes(m.id)).map(m => moduloAtivo === m.id && (
             <div key={m.id} style={styles.moduloArea}>
               <div style={styles.moduloPlaceholder}>
                 <span style={styles.moduloIconeGrande}>{m.icone}</span>
