@@ -12,6 +12,30 @@ L.Icon.Default.mergeOptions({
   shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
+const CAMADAS_BASE = {
+  ruas: {
+    label: '🗺️ Ruas',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  },
+  satelite: {
+    label: '🛰️ Satélite',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; <a href="https://www.esri.com">Esri</a> &mdash; Source: Esri, USGS, AeroGRID, IGN',
+  },
+  relevo: {
+    label: '⛰️ Relevo',
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  },
+}
+
+// Componente interno para trocar o tile layer sem recriar o mapa
+function BaseTileLayer({ tipo }) {
+  const base = CAMADAS_BASE[tipo] || CAMADAS_BASE.ruas
+  return <TileLayer key={tipo} url={base.url} attribution={base.attribution} />
+}
+
 const CORES_PADRAO = [
   '#2d7a4f','#1d4ed8','#b45309','#7c3aed','#dc2626',
   '#0f766e','#be185d','#92400e','#1e40af','#065f46',
@@ -40,6 +64,7 @@ export default function MapaAtuacao() {
   const [editandoNome, setEditandoNome] = useState(null)
   const [novoNome,     setNovoNome]     = useState('')
   const [mapaReady,    setMapaReady]    = useState(false)
+  const [camadasBase,  setCamadasBase]  = useState('ruas')
   const inputRef = useRef()
 
   // ── Carregar camadas salvas ───────────────────────────────────────────────
@@ -272,10 +297,7 @@ export default function MapaAtuacao() {
           zoomControl={false}
           whenReady={() => setMapaReady(true)}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          <BaseTileLayer tipo={camadasBase} />
           <ZoomControl position="bottomright" />
 
           {mapaReady && camadas.filter(c => c.visivel).map(c => (
@@ -294,6 +316,24 @@ export default function MapaAtuacao() {
             />
           )}
         </MapContainer>
+
+        {/* Seletor de mapa base */}
+        <div style={st.seletorBase}>
+          {Object.entries(CAMADAS_BASE).map(([key, { label }]) => (
+            <button
+              key={key}
+              onClick={() => setCamadasBase(key)}
+              style={{
+                ...st.btnBase,
+                background: camadasBase === key ? '#1a4731' : 'rgba(255,255,255,0.95)',
+                color:      camadasBase === key ? '#fff'    : '#374151',
+                fontWeight: camadasBase === key ? '700'     : '400',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         {/* Dica flutuante */}
         {camadas.length === 0 && !carregando && (
@@ -369,6 +409,16 @@ const st = {
   legendaTitulo: { fontSize: '11px', fontWeight: '700', color: '#9ca3af', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' },
   legendaItem: { display: 'flex', alignItems: 'center', gap: '8px' },
   mapaWrap: { flex: 1, position: 'relative', minHeight: '0' },
+  seletorBase: {
+    position: 'absolute', top: '12px', right: '12px', zIndex: 1000,
+    display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.95)',
+    borderRadius: '10px', padding: '4px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    border: '1px solid #e5e7eb',
+  },
+  btnBase: {
+    padding: '7px 13px', borderRadius: '7px', border: 'none', cursor: 'pointer',
+    fontSize: '12px', transition: 'all 0.2s', whiteSpace: 'nowrap',
+  },
   dicaFlutuante: {
     position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)',
     background: 'rgba(255,255,255,0.95)', borderRadius: '10px', padding: '12px 20px',
