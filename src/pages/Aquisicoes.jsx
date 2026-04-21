@@ -65,6 +65,11 @@ export default function Aquisicoes({ perfilUsuario }) {
     await supabase.from('aquisicoes').update({ status: 'aprovado', updated_at: new Date().toISOString() }).eq('id', id)
     carregar()
   }
+  const toggleUrgente = async (id, atual) => {
+    await supabase.from('aquisicoes').update({ urgente: !atual, updated_at: new Date().toISOString() }).eq('id', id)
+    carregar()
+  }
+
   const cancelar  = async (id) => {
     if (!confirm('Cancelar esta aquisição?')) return
     await supabase.from('aquisicoes').update({ status: 'cancelado', updated_at: new Date().toISOString() }).eq('id', id)
@@ -179,10 +184,11 @@ export default function Aquisicoes({ perfilUsuario }) {
             const fornecedores = [...new Set(itens.map(it => it.fornecedor).filter(Boolean))]
 
             return (
-              <div key={a.id} style={{ ...styles.card, background: ri % 2 === 0 ? '#fff' : '#fafafa' }}>
+              <div key={a.id} style={{ ...styles.card, background: a.urgente ? '#fff5f5' : ri % 2 === 0 ? '#fff' : '#fafafa', borderLeft: a.urgente ? '4px solid #dc2626' : '4px solid transparent' }}>
                 {/* Cabeçalho do card */}
                 <div style={styles.cardTopo}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, flexWrap: 'wrap' }}>
+                    {a.urgente && <span style={styles.urgenteTag}>🚨 URGENTE</span>}
                     <span style={styles.demanda}>{a.numero_demanda || 'Sem demanda'}</span>
                     <span style={{ ...styles.badge, background: corTipo.bg, color: corTipo.cor }}>{corTipo.label}</span>
                     <span style={{ ...styles.badge, background: corStatus.bg, color: corStatus.cor }}>{corStatus.label}</span>
@@ -248,6 +254,10 @@ export default function Aquisicoes({ perfilUsuario }) {
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => abrirEditar(a)} style={styles.btnEditar}>✏️ Editar</button>
+                    <button onClick={() => toggleUrgente(a.id, a.urgente)}
+                      style={{ ...styles.btnEditar, background: a.urgente ? '#fee2e2' : '#f3f4f6', color: a.urgente ? '#dc2626' : '#6b7280', border: 'none' }}>
+                      {a.urgente ? '🚨 Urgente' : '🔔 Urgente?'}
+                    </button>
                     {isAdmin && a.status === 'enviado' && (
                       <button onClick={() => aprovar(a.id)} style={styles.btnAprovar}>✓ Aprovar</button>
                     )}
@@ -318,6 +328,7 @@ const styles = {
   fornecedorTag: { fontSize: '12px', color: '#6b7280' },
   obs: { fontSize: '12px', color: '#9ca3af', fontStyle: 'italic' },
   btnEditar: { padding: '6px 12px', borderRadius: '6px', border: '1.5px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '12px' },
+  urgenteTag: { fontSize: '10px', fontWeight: '700', color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: '10px' },
   btnAprovar: { padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#dcfce7', color: '#166534', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
   btnCancelar: { padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#f3f4f6', color: '#6b7280', cursor: 'pointer', fontSize: '12px' },
 }

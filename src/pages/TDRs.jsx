@@ -48,6 +48,11 @@ export default function TDRs({ perfilUsuario }) {
 
   useEffect(() => { carregar() }, [])
 
+  const toggleUrgente = async (id, atual) => {
+    await supabase.from('tdrs').update({ urgente: !atual, updated_at: new Date().toISOString() }).eq('id', id)
+    carregar()
+  }
+
   const abrirNovo   = () => { setSelecionado(null); setModalAberto(true) }
   const abrirEditar = (t) => { setSelecionado(t); setModalAberto(true) }
   const fechar      = () => { setModalAberto(false); setSelecionado(null) }
@@ -122,14 +127,15 @@ export default function TDRs({ perfilUsuario }) {
             const stepAtual = STEPS_KEYS.indexOf(t.status)
             const atrasado  = t.prazo_limite && new Date(t.prazo_limite) < hoje && t.status !== 'aprovado'
             return (
-              <div key={t.id} style={{ ...styles.card, borderLeft: atrasado ? '4px solid #dc2626' : '4px solid #e5e7eb' }}>
+              <div key={t.id} style={{ ...styles.card, borderLeft: t.urgente ? '4px solid #dc2626' : atrasado ? '4px solid #f97316' : '4px solid #e5e7eb', background: t.urgente ? '#fff5f5' : '#fff' }}>
                 {/* Linha 1: número + tipo + status */}
                 <div style={styles.cardTopo}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, flexWrap: 'wrap' }}>
+                    {t.urgente && <span style={styles.urgenteTag}>🚨 URGENTE</span>}
                     <span style={styles.numero}>{t.numero || 'S/N'}</span>
                     <span style={{ ...styles.badge, background: corTipo.bg, color: corTipo.cor }}>{t.tipo}</span>
                     <span style={{ ...styles.badge, background: corStatus.bg, color: corStatus.cor }}>{corStatus.label}</span>
-                    {atrasado && <span style={{ ...styles.badge, background: '#fee2e2', color: '#dc2626' }}>⚠ Atrasado</span>}
+                    {atrasado && <span style={{ ...styles.badge, background: '#ffedd5', color: '#9a3412' }}>⚠ Atrasado</span>}
                   </div>
                 </div>
 
@@ -181,9 +187,11 @@ export default function TDRs({ perfilUsuario }) {
                     <span style={styles.valor}><b>U$</b> {fmtMoeda(t.valor_us)}</span>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => abrirEditar(t)} style={styles.btnRevisar}>
-                      → Revisar
+                    <button onClick={() => toggleUrgente(t.id, t.urgente)}
+                      style={{ ...styles.btnArquivo, background: t.urgente ? '#fee2e2' : '#f3f4f6', color: t.urgente ? '#dc2626' : '#6b7280', border: 'none' }}>
+                      {t.urgente ? '🚨 Urgente' : '🔔 Urgente?'}
                     </button>
+                    <button onClick={() => abrirEditar(t)} style={styles.btnRevisar}>→ Revisar</button>
                     {t.google_drive_url && (
                       <a href={t.google_drive_url} target="_blank" rel="noreferrer"
                         style={styles.btnArquivo} onClick={e => e.stopPropagation()}>
@@ -248,4 +256,5 @@ const styles = {
   valor: { fontSize: '13px', color: '#6b7280' },
   btnRevisar: { padding: '7px 16px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #1a4731, #2d7a4f)', color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: '600' },
   btnArquivo: { padding: '7px 14px', borderRadius: '8px', border: '1.5px solid #d1d5db', background: 'white', color: '#374151', cursor: 'pointer', fontSize: '13px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' },
+  urgenteTag: { fontSize: '10px', fontWeight: '700', color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: '10px' },
 }

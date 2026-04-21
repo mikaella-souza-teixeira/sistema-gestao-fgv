@@ -102,6 +102,11 @@ export default function PassagensDiarias({ perfilUsuario }) {
     setProcessando(null)
   }
 
+  const toggleUrgente = async (id, atual) => {
+    await supabase.from('passagens_diarias').update({ urgente: !atual, updated_at: new Date().toISOString() }).eq('id', id)
+    carregar()
+  }
+
   const cancelarAprovacao = async (id) => {
     if (!confirm('Cancelar a aprovação e devolver para "Enviado"?')) return
     setProcessando(id)
@@ -229,8 +234,9 @@ export default function PassagensDiarias({ perfilUsuario }) {
                   const nomes = beneficiarios.map(b => b.nome_completo || '—').slice(0, 2)
                   const extras = beneficiarios.length > 2 ? ` +${beneficiarios.length - 2}` : ''
                   return (
-                    <tr key={s.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                    <tr key={s.id} style={{ background: s.urgente ? '#fff5f5' : i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e5e7eb', borderLeft: s.urgente ? '4px solid #dc2626' : '4px solid transparent' }}>
                       <td style={styles.td}>
+                        {s.urgente && <span style={styles.urgenteTag}>🚨 URGENTE</span>}
                         <p style={styles.nomeTexto}>{nomes.join(', ')}{extras}</p>
                         <p style={styles.emailTexto}>{s.numero_rpad || 'Sem número'}</p>
                       </td>
@@ -254,8 +260,11 @@ export default function PassagensDiarias({ perfilUsuario }) {
                       </td>
                       <td style={styles.td}>
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          <button onClick={() => abrirEditar(s)} style={styles.btnAcao} title="Editar">
-                            ✏️
+                          <button onClick={() => abrirEditar(s)} style={styles.btnAcao} title="Editar">✏️</button>
+                          <button onClick={() => toggleUrgente(s.id, s.urgente)}
+                            style={{ ...styles.btnAcaoTexto, background: s.urgente ? '#fee2e2' : '#f3f4f6', color: s.urgente ? '#dc2626' : '#6b7280' }}
+                            title={s.urgente ? 'Remover urgência' : 'Marcar como urgente'}>
+                            {s.urgente ? '🚨 Urgente' : '🔔 Urgente?'}
                           </button>
                           {/* Aprovar / Recusar — admin, status enviado */}
                           {isAdmin && s.status === 'enviado' && (
@@ -446,6 +455,7 @@ const styles = {
   statusBadge: { display: 'inline-block', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '500' },
   btnAcao: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px 6px', borderRadius: '6px' },
   btnAcaoTexto: { padding: '5px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
+  urgenteTag: { display: 'inline-block', fontSize: '10px', fontWeight: '700', color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: '10px', marginBottom: '4px' },
   prestacaoCard: { padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: '10px' },
   prestacaoTopo: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' },
   prestacaoNome: { fontSize: '14px', fontWeight: '600', color: '#111827', margin: '0 0 4px 0' },
