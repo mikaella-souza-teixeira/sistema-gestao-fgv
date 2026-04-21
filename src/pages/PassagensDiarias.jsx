@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import FormPassagens from '../components/FormPassagens'
+import { downloadArquivo, downloadZip } from '../lib/downloads'
 
 const STATUS_COR = {
   rascunho:            { bg: '#f3f4f6', cor: '#6b7280' },
@@ -410,16 +411,26 @@ export default function PassagensDiarias({ perfilUsuario }) {
                     )}
 
                     {s.status === 'prestacao_entregue' && (
-                      <div style={{ display: 'flex', gap: '16px', paddingTop: '8px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '10px', paddingTop: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                         {s.anexo_declaracao_url && (
-                          <a href={s.anexo_declaracao_url} target="_blank" rel="noreferrer" style={styles.linkAnexo}>
-                            📄 Ver Declaração
-                          </a>
+                          <>
+                            <a href={s.anexo_declaracao_url} target="_blank" rel="noreferrer" style={styles.linkAnexo}>📄 Ver Declaração</a>
+                            <button onClick={() => downloadArquivo(s.anexo_declaracao_url, `declaracao-${s.id}.pdf`)} style={styles.btnDownload}>⬇️ Baixar</button>
+                          </>
                         )}
                         {s.anexo_relatorio_url && (
-                          <a href={s.anexo_relatorio_url} target="_blank" rel="noreferrer" style={styles.linkAnexo}>
-                            📄 Ver Relatório de Viagem
-                          </a>
+                          <>
+                            <a href={s.anexo_relatorio_url} target="_blank" rel="noreferrer" style={styles.linkAnexo}>📄 Ver Relatório</a>
+                            <button onClick={() => downloadArquivo(s.anexo_relatorio_url, `relatorio-viagem-${s.id}.pdf`)} style={styles.btnDownload}>⬇️ Baixar</button>
+                          </>
+                        )}
+                        {s.anexo_declaracao_url && s.anexo_relatorio_url && (
+                          <button onClick={() => downloadZip([
+                            { url: s.anexo_declaracao_url, nome: 'declaracao.pdf' },
+                            { url: s.anexo_relatorio_url,  nome: 'relatorio-viagem.pdf' },
+                          ], `prestacao-${s.id}`)} style={styles.btnDownloadZip}>
+                            📦 Baixar tudo (.zip)
+                          </button>
                         )}
                       </div>
                     )}
@@ -464,5 +475,7 @@ const styles = {
   prestacaoAnexos: { display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '4px' },
   anexoItem: { display: 'flex', alignItems: 'center' },
   btnAnexo: { padding: '7px 14px', borderRadius: '8px', border: '1.5px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: '500' },
-  linkAnexo: { color: '#1a4731', fontSize: '13px', fontWeight: '600', textDecoration: 'none' },
+  linkAnexo:     { color: '#1a4731', fontSize: '13px', fontWeight: '600', textDecoration: 'none' },
+  btnDownload:   { padding: '4px 10px', borderRadius: '6px', border: '1px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '12px', color: '#374151' },
+  btnDownloadZip:{ padding: '5px 12px', borderRadius: '6px', border: 'none', background: '#1a4731', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
 }

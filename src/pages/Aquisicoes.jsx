@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import ModalAquisicao from '../components/ModalAquisicao'
+import { downloadArquivo, downloadZip } from '../lib/downloads'
 
 const STATUS_COR = {
   rascunho:  { bg: '#f3f4f6', cor: '#6b7280', label: 'Rascunho' },
@@ -217,9 +218,12 @@ export default function Aquisicoes({ perfilUsuario }) {
                           R$ {fmtMoeda(it.valor)}
                         </td>
                         <td style={styles.td}>
-                          {it.nota_fiscal_url
-                            ? <a href={it.nota_fiscal_url} target="_blank" rel="noreferrer" style={styles.linkNota}>📄 Ver nota</a>
-                            : <span style={{ color: '#d1d5db', fontSize: '12px' }}>Sem nota</span>}
+                          {it.nota_fiscal_url ? (
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <a href={it.nota_fiscal_url} target="_blank" rel="noreferrer" style={styles.linkNota}>📄 Ver</a>
+                              <button onClick={() => downloadArquivo(it.nota_fiscal_url, `nota-${it.nome || ii}.pdf`)} style={styles.btnDl}>⬇️</button>
+                            </div>
+                          ) : <span style={{ color: '#d1d5db', fontSize: '12px' }}>Sem nota</span>}
                         </td>
                         <td style={styles.td}>
                           <div style={{ display: 'flex', gap: '4px' }}>
@@ -250,6 +254,19 @@ export default function Aquisicoes({ perfilUsuario }) {
                     )}
                     {a.observacoes && (
                       <span style={styles.obs} title={a.observacoes}>💬 {a.observacoes.slice(0, 60)}{a.observacoes.length > 60 ? '...' : ''}</span>
+                    )}
+                    {/* Botão ZIP — só aparece se houver algum anexo */}
+                    {itens.some(it => it.nota_fiscal_url || (it.fotos_urls || []).length > 0) && (
+                      <button onClick={() => {
+                        const arquivos = []
+                        itens.forEach((it, idx) => {
+                          if (it.nota_fiscal_url) arquivos.push({ url: it.nota_fiscal_url, nome: `item${idx+1}-nota.pdf` })
+                          ;(it.fotos_urls || []).forEach((url, fi) => arquivos.push({ url, nome: `item${idx+1}-foto${fi+1}.jpg` }))
+                        })
+                        downloadZip(arquivos, `aquisicao-${a.numero_demanda || a.id}`)
+                      }} style={styles.btnZip}>
+                        📦 Baixar tudo (.zip)
+                      </button>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -331,4 +348,6 @@ const styles = {
   urgenteTag: { fontSize: '10px', fontWeight: '700', color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: '10px' },
   btnAprovar: { padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#dcfce7', color: '#166534', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
   btnCancelar: { padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#f3f4f6', color: '#6b7280', cursor: 'pointer', fontSize: '12px' },
+  btnDl:  { padding: '2px 7px', borderRadius: '5px', border: '1px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '11px' },
+  btnZip: { padding: '5px 12px', borderRadius: '6px', border: 'none', background: '#1a4731', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
 }

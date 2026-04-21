@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import ModalTDR from '../components/ModalTDR'
+import { downloadArquivo } from '../lib/downloads'
 
 const STATUS_COR = {
   rascunho:        { bg: '#f3f4f6', cor: '#6b7280',  label: 'Rascunho' },
@@ -192,10 +193,22 @@ export default function TDRs({ perfilUsuario }) {
                       {t.urgente ? '🚨 Urgente' : '🔔 Urgente?'}
                     </button>
                     <button onClick={() => abrirEditar(t)} style={styles.btnRevisar}>→ Revisar</button>
+                    {t.arquivo_url && (
+                      <>
+                        <a href={t.arquivo_url} target="_blank" rel="noreferrer"
+                          style={styles.btnArquivo} onClick={e => e.stopPropagation()}>
+                          📁 Ver arquivo
+                        </a>
+                        <button onClick={(e) => { e.stopPropagation(); downloadArquivo(t.arquivo_url, `TDR-${t.numero || t.id}.pdf`) }}
+                          style={styles.btnArquivo}>
+                          ⬇️ Baixar
+                        </button>
+                      </>
+                    )}
                     {t.google_drive_url && (
                       <a href={t.google_drive_url} target="_blank" rel="noreferrer"
                         style={styles.btnArquivo} onClick={e => e.stopPropagation()}>
-                        📁 Arquivo
+                        📁 Google Drive
                       </a>
                     )}
                   </div>
