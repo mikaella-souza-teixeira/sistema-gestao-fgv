@@ -26,7 +26,7 @@ export default function ModalSenha({ usuario, onFechar, onSalvar }) {
     })
 
     if (error) {
-      setErro(`Erro: ${error.message}`)
+      setErro('Erro ao alterar senha. Tente novamente.')
     } else {
       onSalvar()
     }
