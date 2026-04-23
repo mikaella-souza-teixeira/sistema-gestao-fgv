@@ -345,7 +345,7 @@ export default function PassagensDiarias({ perfilUsuario }) {
                     return (
                       <tr key={`${s.id}-${bIdx}`} style={{
                         background: bg,
-                        borderBottom: isLast && !painel ? '1px solid #e5e7eb' : '1px solid #f0f0f0',
+                        borderBottom: isLast ? '1px solid #e5e7eb' : '1px solid #f0f0f0',
                         borderLeft: s.urgente ? '4px solid #dc2626' : '4px solid transparent',
                       }}>
                         <td style={styles.td}>
