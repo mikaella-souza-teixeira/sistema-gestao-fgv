@@ -42,6 +42,7 @@ export default function PassagensDiarias({ perfilUsuario }) {
   const [abaAtiva, setAbaAtiva] = useState('lista') // 'lista' | 'prestacao'
   const [processando, setProcessando] = useState(null)
   const [uploadando, setUploadando] = useState(null)
+  const [grupoAberto, setGrupoAberto] = useState(null)
   const declaracaoRef = useRef({})
   const relatorioRef = useRef({})
   const assinadoRef   = useRef({})
@@ -253,7 +254,7 @@ export default function PassagensDiarias({ perfilUsuario }) {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={styles.thead}>
-                  <th style={styles.th}>Beneficiário(s)</th>
+                  <th style={styles.th}>Solicitação</th>
                   <th style={styles.th}>Demanda</th>
                   <th style={styles.th}>Destino</th>
                   <th style={styles.th}>Data</th>
@@ -263,7 +264,7 @@ export default function PassagensDiarias({ perfilUsuario }) {
                 </tr>
               </thead>
               <tbody>
-                {solicitacoes.flatMap((s, sIdx) => {
+                {solicitacoes.map((s, sIdx) => {
                   const d = s.dados || {}
                   const cor = STATUS_COR[s.status] || STATUS_COR.rascunho
                   const bg  = s.urgente ? '#fff5f5' : sIdx % 2 === 0 ? '#fff' : '#f9fafb'
@@ -274,95 +275,33 @@ export default function PassagensDiarias({ perfilUsuario }) {
                   const beneficiarios = d.beneficiarios?.length
                     ? d.beneficiarios
                     : [{ nome_completo: d.nome_completo }]
-
-                  // Verifica se TODOS os beneficiários têm documento para liberar Aprovar
+                  const aberto = grupoAberto === s.id
                   const todosComDoc = beneficiarios.every((_, i) =>
                     !!(s.anexos_assinados || {})[String(i)]
                   )
 
-                  // Função de ações — recebe bIdx para upload individual por beneficiário
-                  const acoes = (bIdx) => {
-                    const urlBenef = (s.anexos_assinados || {})[String(bIdx)]
-                    const chaveUpload = `${s.id}-${bIdx}`
-                    return (
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <button onClick={() => abrirEditar(s)} style={styles.btnAcao} title="Editar">✏️</button>
-
-                        {/* Upload individual por beneficiário */}
-                        {s.status === 'enviado' && (
-                          <>
-                            <input
-                              ref={el => assinadoRef.current[chaveUpload] = el}
-                              type="file" accept=".pdf,.doc,.docx"
-                              style={{ display: 'none' }}
-                              onChange={e => e.target.files[0] && uploadDocumentoAssinado(s.id, bIdx, e.target.files[0])}
-                            />
-                            <button
-                              onClick={() => assinadoRef.current[chaveUpload]?.click()}
-                              disabled={uploadando === chaveUpload}
-                              style={{
-                                ...styles.btnAcaoTexto,
-                                background: urlBenef ? '#f0fdf4' : '#eff6ff',
-                                color: urlBenef ? '#166534' : '#1d4ed8',
-                              }}>
-                              {uploadando === chaveUpload ? '⏳ Enviando...' : urlBenef ? '✅ Requisição incluída' : '📎 Incluir requisição'}
-                            </button>
-                            {urlBenef && (
-                              <a href={urlBenef} target="_blank" rel="noreferrer"
-                                style={{ fontSize: '12px', color: '#166534', fontWeight: '600' }}>ver</a>
-                            )}
-                          </>
-                        )}
-
-                        {/* Aprovar só quando TODOS têm documento */}
-                        {isAdmin && s.status === 'enviado' && (
-                          <>
-                            <button
-                              onClick={() => aprovar(s.id)}
-                              disabled={processando === s.id || !todosComDoc}
-                              title={todosComDoc ? 'Aprovar' : 'Inclua a requisição de todos os beneficiários primeiro'}
-                              style={{ ...styles.btnAcaoTexto, background: todosComDoc ? '#dcfce7' : '#f3f4f6', color: todosComDoc ? '#166534' : '#9ca3af' }}>
-                              {processando === s.id ? '...' : '✓ Aprovar'}
-                            </button>
-                            <button onClick={() => recusar(s.id)} disabled={processando === s.id}
-                              style={{ ...styles.btnAcaoTexto, background: '#fee2e2', color: '#991b1b' }}>
-                              ✕ Recusar
-                            </button>
-                          </>
-                        )}
-                        {s.status === 'enviado' && (
-                          <button onClick={() => cancelarSolicitacao(s.id)} disabled={processando === s.id}
-                            style={{ ...styles.btnAcaoTexto, background: '#f3f4f6', color: '#6b7280' }}>
-                            🚫 Cancelar
-                          </button>
-                        )}
-                        {isAdmin && s.status === 'aguardando_prestacao' && (
-                          <button onClick={() => cancelarAprovacao(s.id)} disabled={processando === s.id}
-                            style={{ ...styles.btnAcaoTexto, background: '#fef3c7', color: '#92400e' }}>
-                            ↩ Cancelar aprovação
-                          </button>
-                        )}
-                        {(s.status === 'rascunho' || s.status === 'cancelado') && (
-                          <button onClick={() => deletar(s.id)} disabled={processando === s.id}
-                            style={{ ...styles.btnAcaoTexto, background: '#fee2e2', color: '#991b1b' }}>
-                            🗑️ Excluir
-                          </button>
-                        )}
-                      </div>
-                    )
-                  }
-
-                  const linhas = beneficiarios.map((b, bIdx) => {
-                    const isLast = bIdx === beneficiarios.length - 1
-                    return (
-                      <tr key={`${s.id}-${bIdx}`} style={{
-                        background: bg,
-                        borderBottom: isLast ? '1px solid #e5e7eb' : '1px solid #f0f0f0',
-                        borderLeft: s.urgente ? '4px solid #dc2626' : '4px solid transparent',
-                      }}>
+                  return (
+                    <React.Fragment key={s.id}>
+                      {/* ── Linha resumo do grupo ── */}
+                      <tr
+                        style={{
+                          background: bg,
+                          borderBottom: aberto ? 'none' : '1px solid #e5e7eb',
+                          borderLeft: s.urgente ? '4px solid #dc2626' : '4px solid transparent',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => setGrupoAberto(aberto ? null : s.id)}
+                      >
                         <td style={styles.td}>
                           {s.urgente && <span style={styles.urgenteTag}>🚨 URGENTE</span>}
-                          <p style={styles.nomeTexto}>{b.nome_completo || '—'}</p>
+                          <p style={styles.nomeTexto}>
+                            <span style={{ marginRight: '6px', color: '#9ca3af', fontSize: '11px' }}>
+                              {aberto ? '▾' : '▸'}
+                            </span>
+                            {beneficiarios.length > 1
+                              ? `${beneficiarios.length} viajantes`
+                              : beneficiarios[0]?.nome_completo || '—'}
+                          </p>
                           <p style={styles.emailTexto}>{s.numero_rpad || 'Sem número'}</p>
                         </td>
                         <td style={styles.td}>
@@ -388,12 +327,103 @@ export default function PassagensDiarias({ perfilUsuario }) {
                             {STATUS_LABEL[s.status]}
                           </span>
                         </td>
-                        <td style={styles.td}>{acoes(bIdx)}</td>
+                        <td style={styles.td} onClick={e => e.stopPropagation()}>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <button onClick={() => abrirEditar(s)} style={styles.btnAcao} title="Editar">✏️</button>
+                            {isAdmin && s.status === 'enviado' && (
+                              <>
+                                <button
+                                  onClick={() => aprovar(s.id)}
+                                  disabled={processando === s.id || !todosComDoc}
+                                  title={todosComDoc ? 'Aprovar' : 'Inclua a requisição de todos os beneficiários primeiro'}
+                                  style={{ ...styles.btnAcaoTexto, background: todosComDoc ? '#dcfce7' : '#f3f4f6', color: todosComDoc ? '#166534' : '#9ca3af' }}>
+                                  {processando === s.id ? '...' : '✓ Aprovar'}
+                                </button>
+                                <button onClick={() => recusar(s.id)} disabled={processando === s.id}
+                                  style={{ ...styles.btnAcaoTexto, background: '#fee2e2', color: '#991b1b' }}>
+                                  ✕ Recusar
+                                </button>
+                              </>
+                            )}
+                            {s.status === 'enviado' && (
+                              <button onClick={() => cancelarSolicitacao(s.id)} disabled={processando === s.id}
+                                style={{ ...styles.btnAcaoTexto, background: '#f3f4f6', color: '#6b7280' }}>
+                                🚫 Cancelar
+                              </button>
+                            )}
+                            {isAdmin && s.status === 'aguardando_prestacao' && (
+                              <button onClick={() => cancelarAprovacao(s.id)} disabled={processando === s.id}
+                                style={{ ...styles.btnAcaoTexto, background: '#fef3c7', color: '#92400e' }}>
+                                ↩ Cancelar aprovação
+                              </button>
+                            )}
+                            {(s.status === 'rascunho' || s.status === 'cancelado') && (
+                              <button onClick={() => deletar(s.id)} disabled={processando === s.id}
+                                style={{ ...styles.btnAcaoTexto, background: '#fee2e2', color: '#991b1b' }}>
+                                🗑️ Excluir
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
-                    )
-                  })
 
-                  return linhas
+                      {/* ── Linha expandida: lista de beneficiários ── */}
+                      {aberto && (
+                        <tr>
+                          <td colSpan={7} style={{ padding: 0, background: '#f0fdf4', borderBottom: '2px solid #1a4731' }}>
+                            <div style={{ padding: '12px 32px 16px' }}>
+                              <p style={{ fontSize: '11px', fontWeight: '700', color: '#1a4731', textTransform: 'uppercase', letterSpacing: '0.6px', margin: '0 0 10px 0' }}>
+                                Beneficiários desta solicitação
+                              </p>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {beneficiarios.map((b, bIdx) => {
+                                  const urlBenef = (s.anexos_assinados || {})[String(bIdx)]
+                                  const chaveUpload = `${s.id}-${bIdx}`
+                                  return (
+                                    <div key={bIdx} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: 'white', borderRadius: '8px', border: '1px solid #d1fae5' }}>
+                                      <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: '#1a4731', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700', flexShrink: 0 }}>
+                                        {(b.nome_completo || '?').charAt(0).toUpperCase()}
+                                      </div>
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <p style={{ fontSize: '14px', fontWeight: '600', color: '#111827', margin: 0 }}>
+                                          {b.nome_completo || '—'}
+                                        </p>
+                                        {b.cpf && <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>CPF: {b.cpf}</p>}
+                                      </div>
+                                      {s.status === 'enviado' && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <input
+                                            ref={el => assinadoRef.current[chaveUpload] = el}
+                                            type="file" accept=".pdf,.doc,.docx"
+                                            style={{ display: 'none' }}
+                                            onChange={e => e.target.files[0] && uploadDocumentoAssinado(s.id, bIdx, e.target.files[0])}
+                                          />
+                                          <button
+                                            onClick={() => assinadoRef.current[chaveUpload]?.click()}
+                                            disabled={uploadando === chaveUpload}
+                                            style={{ ...styles.btnAcaoTexto, background: urlBenef ? '#f0fdf4' : '#eff6ff', color: urlBenef ? '#166534' : '#1d4ed8' }}>
+                                            {uploadando === chaveUpload ? '⏳ Enviando...' : urlBenef ? '✅ Requisição incluída' : '📎 Incluir requisição'}
+                                          </button>
+                                          {urlBenef && (
+                                            <a href={urlBenef} target="_blank" rel="noreferrer"
+                                              style={{ fontSize: '12px', color: '#166534', fontWeight: '600' }}>ver</a>
+                                          )}
+                                        </div>
+                                      )}
+                                      {s.status !== 'enviado' && urlBenef && (
+                                        <a href={urlBenef} target="_blank" rel="noreferrer"
+                                          style={{ fontSize: '12px', color: '#166534', fontWeight: '600' }}>📄 ver requisição</a>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  )
                 })}
               </tbody>
             </table>
