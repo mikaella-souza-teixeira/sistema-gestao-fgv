@@ -259,171 +259,151 @@ export default function PassagensDiarias({ perfilUsuario }) {
                 </tr>
               </thead>
               <tbody>
-                {(() => {
-                  // Expande uma linha por beneficiário
-                  const linhas = solicitacoes.flatMap((s, sIdx) => {
-                    const d = s.dados || {}
-                    const beneficiarios = d.beneficiarios?.length
-                      ? d.beneficiarios
-                      : [{ nome_completo: d.nome_completo }]
-                    return beneficiarios.map((b, bIdx) => ({
-                      s, d, sIdx, b, bIdx,
-                      total: beneficiarios.length,
-                      isFirst: bIdx === 0,
-                      isLast: bIdx === beneficiarios.length - 1,
-                    }))
-                  })
+                {solicitacoes.flatMap((s, sIdx) => {
+                  const d = s.dados || {}
+                  const cor    = STATUS_COR[s.status] || STATUS_COR.rascunho
+                  const painel = painelAberto === s.id
+                  const bg     = s.urgente ? '#fff5f5' : sIdx % 2 === 0 ? '#fff' : '#f9fafb'
+                  const beneficiarios = d.beneficiarios?.length
+                    ? d.beneficiarios
+                    : [{ nome_completo: d.nome_completo }]
 
-                  return linhas.map(({ s, d, sIdx, b, bIdx, total, isFirst, isLast }) => {
-                    const cor    = STATUS_COR[s.status] || STATUS_COR.rascunho
-                    const bg     = s.urgente ? '#fff5f5' : sIdx % 2 === 0 ? '#fff' : '#f9fafb'
-                    const painel = painelAberto === s.id
-
-                    return (
-                      <React.Fragment key={`${s.id}-${bIdx}`}>
-                        <tr style={{
-                          background: bg,
-                          borderBottom: isLast && !painel ? '1px solid #e5e7eb' : 'none',
-                          borderLeft: s.urgente ? '4px solid #dc2626' : '4px solid transparent',
+                  const acoes = (
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button onClick={() => abrirEditar(s)} style={styles.btnAcao} title="Editar">✏️</button>
+                      <button onClick={() => toggleUrgente(s.id, s.urgente)}
+                        style={{ ...styles.btnAcaoTexto, background: s.urgente ? '#fee2e2' : '#f3f4f6', color: s.urgente ? '#dc2626' : '#6b7280' }}>
+                        {s.urgente ? '🚨 Urgente' : '🔔 Urgente?'}
+                      </button>
+                      {s.status === 'enviado' && (
+                        <button onClick={() => togglePainel(s.id)} style={{
+                          ...styles.btnAcaoTexto,
+                          background: painel ? '#1a4731' : '#eff6ff',
+                          color: painel ? 'white' : '#1d4ed8',
                         }}>
-                          {/* ── Coluna Beneficiário (uma linha por pessoa) ── */}
-                          <td style={{ ...styles.td, borderTop: bIdx > 0 ? '1px dashed #e5e7eb' : 'none' }}>
-                            {isFirst && s.urgente && <span style={styles.urgenteTag}>🚨 URGENTE</span>}
-                            <p style={styles.nomeTexto}>{b.nome_completo || '—'}</p>
-                            {isFirst && <p style={styles.emailTexto}>{s.numero_rpad || 'Sem número'}</p>}
-                            {total > 1 && (
-                              <p style={{ ...styles.emailTexto, color: '#9ca3af', fontStyle: 'italic' }}>
-                                Beneficiário {bIdx + 1}/{total}
-                              </p>
-                            )}
-                          </td>
+                          {s.anexo_assinado_url ? '✅ Incluir requisição' : '📎 Incluir requisição'} {painel ? '▲' : '▼'}
+                        </button>
+                      )}
+                      {isAdmin && s.status === 'enviado' && (
+                        <>
+                          <button
+                            onClick={() => s.anexo_assinado_url ? aprovar(s.id) : togglePainel(s.id)}
+                            disabled={processando === s.id}
+                            title={s.anexo_assinado_url ? 'Aprovar' : 'Inclua a requisição assinada primeiro'}
+                            style={{ ...styles.btnAcaoTexto, background: s.anexo_assinado_url ? '#dcfce7' : '#f3f4f6', color: s.anexo_assinado_url ? '#166534' : '#9ca3af' }}>
+                            {processando === s.id ? '...' : '✓ Aprovar'}
+                          </button>
+                          <button onClick={() => recusar(s.id)} disabled={processando === s.id}
+                            style={{ ...styles.btnAcaoTexto, background: '#fee2e2', color: '#991b1b' }}>
+                            ✕ Recusar
+                          </button>
+                        </>
+                      )}
+                      {s.status === 'enviado' && (
+                        <button onClick={() => cancelarSolicitacao(s.id)} disabled={processando === s.id}
+                          style={{ ...styles.btnAcaoTexto, background: '#f3f4f6', color: '#6b7280' }}>
+                          🚫 Cancelar
+                        </button>
+                      )}
+                      {isAdmin && s.status === 'aguardando_prestacao' && (
+                        <button onClick={() => cancelarAprovacao(s.id)} disabled={processando === s.id}
+                          style={{ ...styles.btnAcaoTexto, background: '#fef3c7', color: '#92400e' }}>
+                          ↩ Cancelar aprovação
+                        </button>
+                      )}
+                      {(s.status === 'rascunho' || s.status === 'cancelado') && (
+                        <button onClick={() => deletar(s.id)} disabled={processando === s.id}
+                          style={{ ...styles.btnAcaoTexto, background: '#fee2e2', color: '#991b1b' }}>
+                          🗑️ Excluir
+                        </button>
+                      )}
+                    </div>
+                  )
 
-                          {/* ── Colunas compartilhadas — só na 1ª linha, rowSpan cobre as demais ── */}
-                          {isFirst && <>
-                            <td style={styles.td} rowSpan={total}>
-                              <p style={{ fontSize: '13px', color: '#374151' }}>{d.numero_demanda || '—'}</p>
-                            </td>
-                            <td style={styles.td} rowSpan={total}>
-                              <p style={{ fontSize: '13px', color: '#374151' }}>
-                                {d.passagem_destino_1 || d.transporte_destino || '—'}
-                              </p>
-                            </td>
-                            <td style={styles.td} rowSpan={total}>
-                              <p style={{ fontSize: '13px', color: '#374151' }}>
-                                {new Date(s.created_at).toLocaleDateString('pt-BR')}
-                              </p>
-                            </td>
-                            <td style={styles.td} rowSpan={total}>
-                              <span style={{ ...styles.statusBadge, background: cor.bg, color: cor.cor }}>
-                                {STATUS_LABEL[s.status]}
-                              </span>
-                            </td>
-                            <td style={styles.td} rowSpan={total}>
-                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                                <button onClick={() => abrirEditar(s)} style={styles.btnAcao} title="Editar">✏️</button>
-                                <button onClick={() => toggleUrgente(s.id, s.urgente)}
-                                  style={{ ...styles.btnAcaoTexto, background: s.urgente ? '#fee2e2' : '#f3f4f6', color: s.urgente ? '#dc2626' : '#6b7280' }}>
-                                  {s.urgente ? '🚨 Urgente' : '🔔 Urgente?'}
-                                </button>
-
-                                {s.status === 'enviado' && (
-                                  <button onClick={() => togglePainel(s.id)} style={{
-                                    ...styles.btnAcaoTexto,
-                                    background: painel ? '#1a4731' : (s.anexo_assinado_url ? '#f0fdf4' : '#eff6ff'),
-                                    color: painel ? 'white' : (s.anexo_assinado_url ? '#166534' : '#1d4ed8'),
-                                  }}>
-                                    {s.anexo_assinado_url ? '✅ Assinado' : '📎 Documentos'} {painel ? '▲' : '▼'}
-                                  </button>
-                                )}
-
-                                {isAdmin && s.status === 'enviado' && (
-                                  <>
-                                    <button
-                                      onClick={() => s.anexo_assinado_url ? aprovar(s.id) : togglePainel(s.id)}
-                                      disabled={processando === s.id}
-                                      title={s.anexo_assinado_url ? 'Aprovar' : 'Anexe o documento assinado primeiro'}
-                                      style={{ ...styles.btnAcaoTexto, background: s.anexo_assinado_url ? '#dcfce7' : '#f3f4f6', color: s.anexo_assinado_url ? '#166534' : '#9ca3af' }}>
-                                      {processando === s.id ? '...' : '✓ Aprovar'}
-                                    </button>
-                                    <button onClick={() => recusar(s.id)} disabled={processando === s.id}
-                                      style={{ ...styles.btnAcaoTexto, background: '#fee2e2', color: '#991b1b' }}>
-                                      ✕ Recusar
-                                    </button>
-                                  </>
-                                )}
-
-                                {s.status === 'enviado' && (
-                                  <button onClick={() => cancelarSolicitacao(s.id)} disabled={processando === s.id}
-                                    style={{ ...styles.btnAcaoTexto, background: '#f3f4f6', color: '#6b7280' }}>
-                                    🚫 Cancelar
-                                  </button>
-                                )}
-                                {isAdmin && s.status === 'aguardando_prestacao' && (
-                                  <button onClick={() => cancelarAprovacao(s.id)} disabled={processando === s.id}
-                                    style={{ ...styles.btnAcaoTexto, background: '#fef3c7', color: '#92400e' }}>
-                                    ↩ Cancelar aprovação
-                                  </button>
-                                )}
-
-                                {/* Excluir — apenas em rascunho ou cancelado */}
-                                {(s.status === 'rascunho' || s.status === 'cancelado') && (
-                                  <button onClick={() => deletar(s.id)} disabled={processando === s.id}
-                                    style={{ ...styles.btnAcaoTexto, background: '#fee2e2', color: '#991b1b' }}>
-                                    🗑️ Excluir
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </>}
-                        </tr>
-
-                        {/* Painel suspenso — só após a última linha do grupo */}
-                        {isLast && painel && (
-                          <tr>
-                            <td colSpan={6} style={{ padding: 0, borderBottom: '2px solid #1a4731' }}>
-                              <div style={styles.painelAnexo}>
-                                <p style={styles.painelTitulo}>📋 Documento assinado</p>
-                                <p style={styles.painelDesc}>
-                                  Anexe o RPAD assinado por todas as partes. O botão "Aprovar" ficará disponível após o envio.
-                                </p>
-                                <div style={styles.painelBotoes}>
-                                  {s.anexo_assinado_url ? (
-                                    <>
-                                      <a href={s.anexo_assinado_url} target="_blank" rel="noreferrer" style={styles.btnVerDoc}>
-                                        📄 Ver documento assinado
-                                      </a>
-                                      <input ref={el => assinadoRef.current[s.id] = el}
-                                        type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
-                                        onChange={e => e.target.files[0] && uploadDocumentoAssinado(s.id, e.target.files[0])} />
-                                      <button onClick={() => assinadoRef.current[s.id]?.click()}
-                                        disabled={uploadando === `${s.id}-assinado`} style={styles.btnSubstituir}>
-                                        🔄 Substituir documento
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <input ref={el => assinadoRef.current[s.id] = el}
-                                        type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
-                                        onChange={e => e.target.files[0] && uploadDocumentoAssinado(s.id, e.target.files[0])} />
-                                      <button onClick={() => assinadoRef.current[s.id]?.click()}
-                                        disabled={uploadando === `${s.id}-assinado`} style={styles.btnUploadDoc}>
-                                        {uploadando === `${s.id}-assinado` ? '⏳ Enviando...' : '📎 Selecionar arquivo (.pdf, .docx)'}
-                                      </button>
-                                    </>
-                                  )}
-                                  <button onClick={() => togglePainel(null)} style={styles.btnFecharPainel}>Fechar ✕</button>
-                                </div>
-                                {!s.anexo_assinado_url && (
-                                  <p style={styles.painelAviso}>⚠️ Sem o documento assinado, não é possível aprovar esta solicitação.</p>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
+                  const linhas = beneficiarios.map((b, bIdx) => {
+                    const isLast = bIdx === beneficiarios.length - 1
+                    return (
+                      <tr key={`${s.id}-${bIdx}`} style={{
+                        background: bg,
+                        borderBottom: isLast && !painel ? '1px solid #e5e7eb' : '1px solid #f0f0f0',
+                        borderLeft: s.urgente ? '4px solid #dc2626' : '4px solid transparent',
+                      }}>
+                        <td style={styles.td}>
+                          {s.urgente && <span style={styles.urgenteTag}>🚨 URGENTE</span>}
+                          <p style={styles.nomeTexto}>{b.nome_completo || '—'}</p>
+                          <p style={styles.emailTexto}>{s.numero_rpad || 'Sem número'}</p>
+                        </td>
+                        <td style={styles.td}>
+                          <p style={{ fontSize: '13px', color: '#374151' }}>{d.numero_demanda || '—'}</p>
+                        </td>
+                        <td style={styles.td}>
+                          <p style={{ fontSize: '13px', color: '#374151' }}>
+                            {d.passagem_destino_1 || d.transporte_destino || '—'}
+                          </p>
+                        </td>
+                        <td style={styles.td}>
+                          <p style={{ fontSize: '13px', color: '#374151' }}>
+                            {new Date(s.created_at).toLocaleDateString('pt-BR')}
+                          </p>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={{ ...styles.statusBadge, background: cor.bg, color: cor.cor }}>
+                            {STATUS_LABEL[s.status]}
+                          </span>
+                        </td>
+                        <td style={styles.td}>{acoes}</td>
+                      </tr>
                     )
                   })
-                })()}
+
+                  // Painel suspenso — aparece depois do último beneficiário
+                  if (painel) {
+                    linhas.push(
+                      <tr key={`${s.id}-painel`}>
+                        <td colSpan={6} style={{ padding: 0, borderBottom: '2px solid #1a4731' }}>
+                          <div style={styles.painelAnexo}>
+                            <p style={styles.painelTitulo}>📋 Incluir requisição assinada</p>
+                            <p style={styles.painelDesc}>
+                              Anexe o RPAD assinado por todas as partes. O botão "Aprovar" ficará disponível após o envio.
+                            </p>
+                            <div style={styles.painelBotoes}>
+                              {s.anexo_assinado_url ? (
+                                <>
+                                  <a href={s.anexo_assinado_url} target="_blank" rel="noreferrer" style={styles.btnVerDoc}>
+                                    📄 Ver requisição anexada
+                                  </a>
+                                  <input ref={el => assinadoRef.current[s.id] = el}
+                                    type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                                    onChange={e => e.target.files[0] && uploadDocumentoAssinado(s.id, e.target.files[0])} />
+                                  <button onClick={() => assinadoRef.current[s.id]?.click()}
+                                    disabled={uploadando === `${s.id}-assinado`} style={styles.btnSubstituir}>
+                                    🔄 Substituir arquivo
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <input ref={el => assinadoRef.current[s.id] = el}
+                                    type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                                    onChange={e => e.target.files[0] && uploadDocumentoAssinado(s.id, e.target.files[0])} />
+                                  <button onClick={() => assinadoRef.current[s.id]?.click()}
+                                    disabled={uploadando === `${s.id}-assinado`} style={styles.btnUploadDoc}>
+                                    {uploadando === `${s.id}-assinado` ? '⏳ Enviando...' : '📎 Selecionar arquivo (.pdf, .docx)'}
+                                  </button>
+                                </>
+                              )}
+                              <button onClick={() => togglePainel(null)} style={styles.btnFecharPainel}>Fechar ✕</button>
+                            </div>
+                            {!s.anexo_assinado_url && (
+                              <p style={styles.painelAviso}>⚠️ Sem a requisição assinada, não é possível aprovar esta solicitação.</p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  }
+
+                  return linhas
+                })}
               </tbody>
             </table>
           )}
