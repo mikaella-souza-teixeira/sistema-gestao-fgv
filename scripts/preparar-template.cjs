@@ -106,6 +106,9 @@ console.log('✏️  Aplicando substituições de texto...')
 // Ordem IMPORTA: strings mais longas/específicas PRIMEIRO para evitar colisões de substring
 
 const substituicoes = [
+  // ── Data do documento ─────────────────────────────────────────────────────
+  ['DD/MM/AAAA',                       '{data_documento}'],
+
   // ── Beneficiário ──────────────────────────────────────────────────────────
   ['XXXXXXXXX XXXXXX',                 '{nome_completo}'],
   ['XX.XXX.XXX-XX',                    '{cpf}'],

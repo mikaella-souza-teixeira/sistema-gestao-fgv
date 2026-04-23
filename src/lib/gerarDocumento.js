@@ -130,6 +130,7 @@ export async function gerarDocumentoWord(dados) {
     // ── Solicitante ─────────────────────────────────────────────────────────
     nome_solicitante:    dados.nome_completo      || '',
     unidade_solicitante: dados.unidade_solicitante || '',
+    data_documento:      new Date().toLocaleDateString('pt-BR'),
 
     // ── Passagem aérea (vazio se não tem passagem) ──────────────────────────
     passagem_orig_1:     temPassagem ? (dados.passagem_origem_1  || '') : '',

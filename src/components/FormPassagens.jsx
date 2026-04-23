@@ -377,7 +377,13 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
   const totalDiarias = calcularTotais(form.diarias || {})
   const totalGeral = totalDiarias + Number(form.passagem_valor || 0) + Number(form.transporte_valor || 0) + Number(form.hospedagem_valor || 0)
 
-  const abas = ['Viajantes', 'Projeto', ...(form.tem_passagem === 'sim' ? ['Passagem Aérea'] : []), 'Transporte', 'Hospedagem', 'Diárias']
+  const abas = [
+    'Viajantes', 'Projeto',
+    ...(form.tem_passagem === 'sim' ? ['Passagem Aérea'] : []),
+    'Transporte',
+    ...(form.tem_passagem === 'sim' ? ['Hospedagem'] : []),
+    'Diárias',
+  ]
   const v = form.beneficiarios[viajanteSel] || VIAJANTE_VAZIO
 
   return (
@@ -588,8 +594,24 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
                   onChange={e => set('proc_numero', e.target.value)} placeholder="Número do processo administrativo" />
               </Campo>
               <Campo label="Unidade do Solicitante">
-                <input style={styles.input} value={form.unidade_solicitante}
-                  onChange={e => set('unidade_solicitante', e.target.value)} />
+                <select style={styles.input} value={form.unidade_solicitante}
+                  onChange={e => set('unidade_solicitante', e.target.value)}>
+                  <option value="">Selecione a unidade...</option>
+                  <optgroup label="SEMA AC">
+                    <option>SEMA AC/DEBIO</option>
+                    <option>SEMA AC/DEUC</option>
+                    <option>SEMA AC/FUNTAC</option>
+                    <option>SEMA AC/DESIL</option>
+                    <option>SEMA AC/CIGMA</option>
+                  </optgroup>
+                  <optgroup label="ICMBIO">
+                    <option>ICMBIO/NGI NOVO AIRAO</option>
+                    <option>ICMBIO/NGI TEFÉ</option>
+                    <option>ICMBIO/CBC</option>
+                    <option>ICMBIO/DSAM</option>
+                    <option>ICMBIO/COMAG</option>
+                  </optgroup>
+                </select>
               </Campo>
             </div>
 
