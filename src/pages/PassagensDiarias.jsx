@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import FormPassagens from '../components/FormPassagens'
 import { downloadArquivo, downloadZip } from '../lib/downloads'
@@ -41,9 +41,12 @@ export default function PassagensDiarias({ perfilUsuario }) {
   const [abaAtiva, setAbaAtiva] = useState('lista') // 'lista' | 'prestacao'
   const [processando, setProcessando] = useState(null)
   const [uploadando, setUploadando] = useState(null)
+  const [painelAberto, setPainelAberto] = useState(null) // id da solicitação com painel aberto
   const declaracaoRef = useRef({})
   const relatorioRef = useRef({})
   const assinadoRef   = useRef({})
+
+  const togglePainel = (id) => setPainelAberto(prev => prev === id ? null : id)
 
   const isAdmin = perfilUsuario?.perfil === 'administrador'
 
@@ -255,105 +258,114 @@ export default function PassagensDiarias({ perfilUsuario }) {
                   const nomes = beneficiarios.map(b => b.nome_completo || '—').slice(0, 2)
                   const extras = beneficiarios.length > 2 ? ` +${beneficiarios.length - 2}` : ''
                   return (
-                    <tr key={s.id} style={{ background: s.urgente ? '#fff5f5' : i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e5e7eb', borderLeft: s.urgente ? '4px solid #dc2626' : '4px solid transparent' }}>
-                      <td style={styles.td}>
-                        {s.urgente && <span style={styles.urgenteTag}>🚨 URGENTE</span>}
-                        <p style={styles.nomeTexto}>{nomes.join(', ')}{extras}</p>
-                        <p style={styles.emailTexto}>{s.numero_rpad || 'Sem número'}</p>
-                      </td>
-                      <td style={styles.td}>
-                        <p style={{ fontSize: '13px', color: '#374151' }}>{d.numero_demanda || '—'}</p>
-                      </td>
-                      <td style={styles.td}>
-                        <p style={{ fontSize: '13px', color: '#374151' }}>
-                          {d.passagem_destino_1 || d.transporte_destino || '—'}
-                        </p>
-                      </td>
-                      <td style={styles.td}>
-                        <p style={{ fontSize: '13px', color: '#374151' }}>
-                          {new Date(s.created_at).toLocaleDateString('pt-BR')}
-                        </p>
-                      </td>
-                      <td style={styles.td}>
-                        <span style={{ ...styles.statusBadge, background: cor.bg, color: cor.cor }}>
-                          {STATUS_LABEL[s.status]}
-                        </span>
-                      </td>
-                      <td style={styles.td}>
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                          <button onClick={() => abrirEditar(s)} style={styles.btnAcao} title="Editar">✏️</button>
-                          <button onClick={() => toggleUrgente(s.id, s.urgente)}
-                            style={{ ...styles.btnAcaoTexto, background: s.urgente ? '#fee2e2' : '#f3f4f6', color: s.urgente ? '#dc2626' : '#6b7280' }}
-                            title={s.urgente ? 'Remover urgência' : 'Marcar como urgente'}>
-                            {s.urgente ? '🚨 Urgente' : '🔔 Urgente?'}
-                          </button>
-
-                          {/* ── Documento assinado (status enviado) ────────── */}
-                          {s.status === 'enviado' && (
-                            s.anexo_assinado_url ? (
-                              <a href={s.anexo_assinado_url} target="_blank" rel="noreferrer"
-                                style={{ ...styles.btnAcaoTexto, background: '#f0fdf4', color: '#166534', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                ✅ Doc. assinado
-                              </a>
-                            ) : (
+                    <React.Fragment key={s.id}>
+                      <tr style={{ background: s.urgente ? '#fff5f5' : i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: painelAberto === s.id ? 'none' : '1px solid #e5e7eb', borderLeft: s.urgente ? '4px solid #dc2626' : '4px solid transparent' }}>
+                        <td style={styles.td}>
+                          {s.urgente && <span style={styles.urgenteTag}>🚨 URGENTE</span>}
+                          <p style={styles.nomeTexto}>{nomes.join(', ')}{extras}</p>
+                          <p style={styles.emailTexto}>{s.numero_rpad || 'Sem número'}</p>
+                        </td>
+                        <td style={styles.td}><p style={{ fontSize: '13px', color: '#374151' }}>{d.numero_demanda || '—'}</p></td>
+                        <td style={styles.td}><p style={{ fontSize: '13px', color: '#374151' }}>{d.passagem_destino_1 || d.transporte_destino || '—'}</p></td>
+                        <td style={styles.td}><p style={{ fontSize: '13px', color: '#374151' }}>{new Date(s.created_at).toLocaleDateString('pt-BR')}</p></td>
+                        <td style={styles.td}>
+                          <span style={{ ...styles.statusBadge, background: cor.bg, color: cor.cor }}>{STATUS_LABEL[s.status]}</span>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <button onClick={() => abrirEditar(s)} style={styles.btnAcao} title="Editar">✏️</button>
+                            <button onClick={() => toggleUrgente(s.id, s.urgente)}
+                              style={{ ...styles.btnAcaoTexto, background: s.urgente ? '#fee2e2' : '#f3f4f6', color: s.urgente ? '#dc2626' : '#6b7280' }}>
+                              {s.urgente ? '🚨 Urgente' : '🔔 Urgente?'}
+                            </button>
+                            {s.status === 'enviado' && (
+                              <button onClick={() => togglePainel(s.id)} style={{
+                                ...styles.btnAcaoTexto,
+                                background: painelAberto === s.id ? '#1a4731' : (s.anexo_assinado_url ? '#f0fdf4' : '#eff6ff'),
+                                color: painelAberto === s.id ? 'white' : (s.anexo_assinado_url ? '#166534' : '#1d4ed8'),
+                              }}>
+                                {s.anexo_assinado_url ? '✅ Assinado' : '📎 Documentos'} {painelAberto === s.id ? '▲' : '▼'}
+                              </button>
+                            )}
+                            {isAdmin && s.status === 'enviado' && (
                               <>
-                                <input
-                                  ref={el => assinadoRef.current[s.id] = el}
-                                  type="file" accept=".pdf,.doc,.docx"
-                                  style={{ display: 'none' }}
-                                  onChange={e => e.target.files[0] && uploadDocumentoAssinado(s.id, e.target.files[0])}
-                                />
                                 <button
-                                  onClick={() => assinadoRef.current[s.id]?.click()}
-                                  disabled={uploadando === `${s.id}-assinado`}
-                                  title="Anexe o documento assinado por todas as partes para poder aprovar"
-                                  style={{ ...styles.btnAcaoTexto, background: '#eff6ff', color: '#1d4ed8' }}>
-                                  {uploadando === `${s.id}-assinado` ? '⏳ Enviando...' : '📎 Anexar Assinado'}
+                                  onClick={() => s.anexo_assinado_url ? aprovar(s.id) : togglePainel(s.id)}
+                                  disabled={processando === s.id}
+                                  title={s.anexo_assinado_url ? 'Aprovar' : 'Anexe o documento assinado primeiro'}
+                                  style={{ ...styles.btnAcaoTexto, background: s.anexo_assinado_url ? '#dcfce7' : '#f3f4f6', color: s.anexo_assinado_url ? '#166534' : '#9ca3af', cursor: 'pointer' }}>
+                                  {processando === s.id ? '...' : '✓ Aprovar'}
                                 </button>
+                                <button onClick={() => recusar(s.id)} disabled={processando === s.id}
+                                  style={{ ...styles.btnAcaoTexto, background: '#fee2e2', color: '#991b1b' }}>✕ Recusar</button>
                               </>
-                            )
-                          )}
+                            )}
+                            {s.status === 'enviado' && (
+                              <button onClick={() => cancelarSolicitacao(s.id)} disabled={processando === s.id}
+                                style={{ ...styles.btnAcaoTexto, background: '#f3f4f6', color: '#6b7280' }}>🚫 Cancelar</button>
+                            )}
+                            {isAdmin && s.status === 'aguardando_prestacao' && (
+                              <button onClick={() => cancelarAprovacao(s.id)} disabled={processando === s.id}
+                                style={{ ...styles.btnAcaoTexto, background: '#fef3c7', color: '#92400e' }}>↩ Cancelar aprovação</button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
 
-                          {/* Aprovar / Recusar — admin, status enviado, exige documento assinado */}
-                          {isAdmin && s.status === 'enviado' && (
-                            <>
-                              <button
-                                onClick={() => s.anexo_assinado_url ? aprovar(s.id) : alert('Anexe o documento assinado antes de aprovar.')}
-                                disabled={processando === s.id}
-                                title={s.anexo_assinado_url ? 'Aprovar solicitação' : 'Anexe o documento assinado primeiro'}
-                                style={{
-                                  ...styles.btnAcaoTexto,
-                                  background: s.anexo_assinado_url ? '#dcfce7' : '#f3f4f6',
-                                  color: s.anexo_assinado_url ? '#166534' : '#9ca3af',
-                                  cursor: s.anexo_assinado_url ? 'pointer' : 'not-allowed',
-                                }}>
-                                {processando === s.id ? '...' : '✓ Aprovar'}
-                              </button>
-                              <button onClick={() => recusar(s.id)} disabled={processando === s.id}
-                                style={{ ...styles.btnAcaoTexto, background: '#fee2e2', color: '#991b1b' }}>
-                                ✕ Recusar
-                              </button>
-                            </>
-                          )}
-
-                          {/* Cancelar solicitação — status enviado */}
-                          {s.status === 'enviado' && (
-                            <button onClick={() => cancelarSolicitacao(s.id)} disabled={processando === s.id}
-                              style={{ ...styles.btnAcaoTexto, background: '#f3f4f6', color: '#6b7280' }}>
-                              🚫 Cancelar
-                            </button>
-                          )}
-
-                          {/* Cancelar aprovação — admin, status aguardando_prestacao */}
-                          {isAdmin && s.status === 'aguardando_prestacao' && (
-                            <button onClick={() => cancelarAprovacao(s.id)} disabled={processando === s.id}
-                              style={{ ...styles.btnAcaoTexto, background: '#fef3c7', color: '#92400e' }}>
-                              ↩ Cancelar aprovação
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                      {/* Painel suspenso */}
+                      {painelAberto === s.id && (
+                        <tr>
+                          <td colSpan={6} style={{ padding: 0, borderBottom: '2px solid #1a4731' }}>
+                            <div style={styles.painelAnexo}>
+                              <p style={styles.painelTitulo}>📋 Documento assinado — {nomes.join(', ')}</p>
+                              <p style={styles.painelDesc}>
+                                Anexe o RPAD assinado por todas as partes. O botão "Aprovar" ficará disponível após o envio.
+                              </p>
+                              <div style={styles.painelBotoes}>
+                                {s.anexo_assinado_url ? (
+                                  <>
+                                    <a href={s.anexo_assinado_url} target="_blank" rel="noreferrer" style={styles.btnVerDoc}>
+                                      📄 Ver documento assinado
+                                    </a>
+                                    <>
+                                      <input
+                                        ref={el => assinadoRef.current[s.id] = el}
+                                        type="file" accept=".pdf,.doc,.docx"
+                                        style={{ display: 'none' }}
+                                        onChange={e => e.target.files[0] && uploadDocumentoAssinado(s.id, e.target.files[0])}
+                                      />
+                                      <button onClick={() => assinadoRef.current[s.id]?.click()}
+                                        disabled={uploadando === `${s.id}-assinado`}
+                                        style={styles.btnSubstituir}>
+                                        🔄 Substituir documento
+                                      </button>
+                                    </>
+                                  </>
+                                ) : (
+                                  <>
+                                    <input
+                                      ref={el => assinadoRef.current[s.id] = el}
+                                      type="file" accept=".pdf,.doc,.docx"
+                                      style={{ display: 'none' }}
+                                      onChange={e => e.target.files[0] && uploadDocumentoAssinado(s.id, e.target.files[0])}
+                                    />
+                                    <button onClick={() => assinadoRef.current[s.id]?.click()}
+                                      disabled={uploadando === `${s.id}-assinado`}
+                                      style={styles.btnUploadDoc}>
+                                      {uploadando === `${s.id}-assinado` ? '⏳ Enviando...' : '📎 Selecionar arquivo (.pdf, .docx)'}
+                                    </button>
+                                  </>
+                                )}
+                                <button onClick={() => togglePainel(null)} style={styles.btnFecharPainel}>Fechar ✕</button>
+                              </div>
+                              {!s.anexo_assinado_url && (
+                                <p style={styles.painelAviso}>⚠️ Sem o documento assinado, não é possível aprovar esta solicitação.</p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   )
                 })}
               </tbody>
@@ -535,4 +547,14 @@ const styles = {
   linkAnexo:     { color: '#1a4731', fontSize: '13px', fontWeight: '600', textDecoration: 'none' },
   btnDownload:   { padding: '4px 10px', borderRadius: '6px', border: '1px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '12px', color: '#374151' },
   btnDownloadZip:{ padding: '5px 12px', borderRadius: '6px', border: 'none', background: '#1a4731', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
+  // ── Painel suspenso de documentos assinados ──────────────────────────────
+  painelAnexo: { background: '#f0fdf4', borderTop: '1px solid #bbf7d0', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '10px' },
+  painelTitulo: { fontSize: '14px', fontWeight: '700', color: '#14532d', margin: 0 },
+  painelDesc: { fontSize: '13px', color: '#166534', margin: 0 },
+  painelBotoes: { display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' },
+  btnVerDoc: { display: 'inline-block', padding: '8px 16px', borderRadius: '8px', border: '1.5px solid #16a34a', background: 'white', color: '#15803d', fontSize: '13px', fontWeight: '600', textDecoration: 'none', cursor: 'pointer' },
+  btnSubstituir: { padding: '8px 16px', borderRadius: '8px', border: '1.5px solid #d1d5db', background: 'white', color: '#6b7280', fontSize: '13px', fontWeight: '500', cursor: 'pointer' },
+  btnUploadDoc: { padding: '8px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #1a4731, #2d7a4f)', color: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
+  btnFecharPainel: { padding: '8px 14px', borderRadius: '8px', border: '1px solid #d1d5db', background: 'white', color: '#6b7280', fontSize: '12px', cursor: 'pointer', marginLeft: 'auto' },
+  painelAviso: { fontSize: '12px', color: '#92400e', background: '#fef3c7', padding: '8px 12px', borderRadius: '6px', margin: 0 },
 }
