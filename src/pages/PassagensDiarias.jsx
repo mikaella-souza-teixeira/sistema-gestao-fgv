@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import FormPassagens from '../components/FormPassagens'
 import { downloadArquivo, downloadZip } from '../lib/downloads'
+import { calcularTotais, formatarMoeda } from '../lib/gerarDocumento'
 
 const STATUS_COR = {
   rascunho:            { bg: '#f3f4f6', cor: '#6b7280' },
@@ -256,6 +257,7 @@ export default function PassagensDiarias({ perfilUsuario }) {
                   <th style={styles.th}>Demanda</th>
                   <th style={styles.th}>Destino</th>
                   <th style={styles.th}>Data</th>
+                  <th style={styles.th}>Valor</th>
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>Ações</th>
                 </tr>
@@ -265,6 +267,10 @@ export default function PassagensDiarias({ perfilUsuario }) {
                   const d = s.dados || {}
                   const cor = STATUS_COR[s.status] || STATUS_COR.rascunho
                   const bg  = s.urgente ? '#fff5f5' : sIdx % 2 === 0 ? '#fff' : '#f9fafb'
+                  const totalValor = calcularTotais(d.diarias || {})
+                    + Number(d.passagem_valor || 0)
+                    + Number(d.transporte_valor || 0)
+                    + Number(d.hospedagem_valor || 0)
                   const beneficiarios = d.beneficiarios?.length
                     ? d.beneficiarios
                     : [{ nome_completo: d.nome_completo }]
@@ -370,6 +376,11 @@ export default function PassagensDiarias({ perfilUsuario }) {
                         <td style={styles.td}>
                           <p style={{ fontSize: '13px', color: '#374151' }}>
                             {new Date(s.created_at).toLocaleDateString('pt-BR')}
+                          </p>
+                        </td>
+                        <td style={styles.td}>
+                          <p style={{ fontSize: '13px', fontWeight: '600', color: totalValor > 0 ? '#166534' : '#9ca3af' }}>
+                            {totalValor > 0 ? `R$ ${formatarMoeda(totalValor)}` : '—'}
                           </p>
                         </td>
                         <td style={styles.td}>
