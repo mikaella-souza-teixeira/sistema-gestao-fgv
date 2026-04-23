@@ -1,6 +1,72 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { gerarDocumentoWord, calcularTotais, formatarMoeda } from '../lib/gerarDocumento'
+
+// ── Autocomplete de nome do beneficiário ────────────────────────────────────
+function AutocompleteNome({ value, onChange, onSelect, inputStyle }) {
+  const [sugestoes, setSugestoes] = useState([])
+  const [aberto, setAberto] = useState(false)
+  const timerRef = useRef(null)
+
+  const handleChange = (e) => {
+    const val = e.target.value
+    onChange(val)
+    clearTimeout(timerRef.current)
+    if (val.length >= 2) {
+      timerRef.current = setTimeout(async () => {
+        const { data } = await supabase
+          .from('beneficiarios_cadastrados')
+          .select('*')
+          .ilike('nome_completo', `%${val}%`)
+          .limit(6)
+        setSugestoes(data || [])
+        setAberto((data || []).length > 0)
+      }, 300)
+    } else {
+      setSugestoes([])
+      setAberto(false)
+    }
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        style={inputStyle}
+        value={value}
+        onChange={handleChange}
+        onFocus={() => sugestoes.length > 0 && setAberto(true)}
+        onBlur={() => setTimeout(() => setAberto(false), 180)}
+        placeholder="Digite para buscar cadastros anteriores..."
+        autoComplete="off"
+      />
+      {aberto && (
+        <div style={estilosAC.caixa}>
+          {sugestoes.map(b => (
+            <div key={b.id} onMouseDown={() => { onSelect(b); setAberto(false) }}
+              style={estilosAC.item}>
+              <span style={estilosAC.nome}>{b.nome_completo}</span>
+              <span style={estilosAC.info}>{b.cpf ? `CPF: ${b.cpf}` : 'Sem CPF'}{b.banco ? ` · ${b.banco}` : ''}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const estilosAC = {
+  caixa: {
+    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+    background: 'white', border: '1.5px solid #1a4731', borderRadius: '8px',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.15)', marginTop: '3px', overflow: 'hidden',
+  },
+  item: {
+    padding: '10px 14px', cursor: 'pointer', display: 'flex', flexDirection: 'column',
+    gap: '2px', borderBottom: '1px solid #f3f4f6', transition: 'background 0.1s',
+  },
+  nome: { fontSize: '14px', fontWeight: '600', color: '#111827' },
+  info: { fontSize: '12px', color: '#6b7280' },
+}
 
 const BANCOS_BR = [
   { codigo: '001', nome: 'Banco do Brasil' },
@@ -225,6 +291,45 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
     setBuscandoDemanda(false)
   }, [])
 
+  // Salva/atualiza cada beneficiário no banco para autocomplete futuro
+  const upsertBeneficiarios = async () => {
+    for (const b of form.beneficiarios) {
+      if (!b.nome_completo) continue
+      const dados = {
+        nome_completo: b.nome_completo,
+        cpf: b.cpf || null,
+        email: b.email || null,
+        telefone: b.telefone || null,
+        data_nascimento: b.data_nascimento || null,
+        endereco: b.endereco || null,
+        cep: b.cep || null,
+        complemento_bairro: b.complemento_bairro || null,
+        cidade_estado: b.cidade_estado || null,
+        banco: b.banco || null,
+        codigo_banco: b.codigo_banco || null,
+        agencia_numero: b.agencia_numero || null,
+        agencia_digito: b.agencia_digito || null,
+        conta_numero: b.conta_numero || null,
+        conta_digito: b.conta_digito || null,
+        updated_at: new Date().toISOString(),
+      }
+      if (b.cpf) {
+        await supabase.from('beneficiarios_cadastrados')
+          .upsert(dados, { onConflict: 'cpf' })
+      } else {
+        // Sem CPF: tenta atualizar por nome ou inserir novo
+        const { data: ex } = await supabase
+          .from('beneficiarios_cadastrados')
+          .select('id').ilike('nome_completo', b.nome_completo).limit(1).maybeSingle()
+        if (ex) {
+          await supabase.from('beneficiarios_cadastrados').update(dados).eq('id', ex.id)
+        } else {
+          await supabase.from('beneficiarios_cadastrados').insert(dados)
+        }
+      }
+    }
+  }
+
   const salvar = async (status = 'rascunho') => {
     setSalvando(true); setErro('')
     try {
@@ -235,6 +340,7 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
       } else {
         await supabase.from('passagens_diarias').insert(payload)
       }
+      await upsertBeneficiarios()
       onSalvar()
     } catch { setErro('Erro ao salvar. Tente novamente.') }
     setSalvando(false)
@@ -258,6 +364,7 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
           })
         }
       }
+      await upsertBeneficiarios()
       // Gerar um Word por viajante
       for (const beneficiario of form.beneficiarios) {
         await gerarDocumentoWord({ ...form, ...beneficiario })
@@ -347,8 +454,21 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
 
             <div style={styles.grid2}>
               <Campo label="Nome Completo *">
-                <input style={styles.input} value={v.nome_completo}
-                  onChange={e => setViajante(viajanteSel, 'nome_completo', e.target.value)} />
+                <AutocompleteNome
+                  value={v.nome_completo}
+                  inputStyle={styles.input}
+                  onChange={val => setViajante(viajanteSel, 'nome_completo', val)}
+                  onSelect={b => {
+                    // Preenche todos os campos do beneficiário com os dados salvos
+                    const { id: _id, created_at: _c, updated_at: _u, ...campos } = b
+                    setForm(f => ({
+                      ...f,
+                      beneficiarios: f.beneficiarios.map((ben, i) =>
+                        i === viajanteSel ? { ...ben, ...campos } : ben
+                      ),
+                    }))
+                  }}
+                />
               </Campo>
               <Campo label="CPF">
                 <input style={styles.input} value={v.cpf}
