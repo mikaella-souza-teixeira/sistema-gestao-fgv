@@ -43,6 +43,7 @@ export default function PassagensDiarias({ perfilUsuario }) {
   const [uploadando, setUploadando] = useState(null)
   const declaracaoRef = useRef({})
   const relatorioRef = useRef({})
+  const assinadoRef   = useRef({})
 
   const isAdmin = perfilUsuario?.perfil === 'administrador'
 
@@ -119,6 +120,25 @@ export default function PassagensDiarias({ perfilUsuario }) {
     }).eq('id', id)
     await carregar()
     setProcessando(null)
+  }
+
+  const uploadDocumentoAssinado = async (id, arquivo) => {
+    setUploadando(`${id}-assinado`)
+    try {
+      const ext = arquivo.name.split('.').pop()
+      const path = `solicitacoes/${id}/documento-assinado.${ext}`
+      const { error } = await supabase.storage.from('anexos').upload(path, arquivo, { upsert: true })
+      if (error) throw error
+      const { data: urlData } = supabase.storage.from('anexos').getPublicUrl(path)
+      await supabase.from('passagens_diarias').update({
+        anexo_assinado_url: urlData.publicUrl,
+        updated_at: new Date().toISOString(),
+      }).eq('id', id)
+      await carregar()
+    } catch (e) {
+      alert(`Erro ao fazer upload: ${e.message}`)
+    }
+    setUploadando(null)
   }
 
   const uploadAnexo = async (id, tipo, arquivo) => {
@@ -260,18 +280,53 @@ export default function PassagensDiarias({ perfilUsuario }) {
                         </span>
                       </td>
                       <td style={styles.td}>
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                           <button onClick={() => abrirEditar(s)} style={styles.btnAcao} title="Editar">✏️</button>
                           <button onClick={() => toggleUrgente(s.id, s.urgente)}
                             style={{ ...styles.btnAcaoTexto, background: s.urgente ? '#fee2e2' : '#f3f4f6', color: s.urgente ? '#dc2626' : '#6b7280' }}
                             title={s.urgente ? 'Remover urgência' : 'Marcar como urgente'}>
                             {s.urgente ? '🚨 Urgente' : '🔔 Urgente?'}
                           </button>
-                          {/* Aprovar / Recusar — admin, status enviado */}
+
+                          {/* ── Documento assinado (status enviado) ────────── */}
+                          {s.status === 'enviado' && (
+                            s.anexo_assinado_url ? (
+                              <a href={s.anexo_assinado_url} target="_blank" rel="noreferrer"
+                                style={{ ...styles.btnAcaoTexto, background: '#f0fdf4', color: '#166534', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                ✅ Doc. assinado
+                              </a>
+                            ) : (
+                              <>
+                                <input
+                                  ref={el => assinadoRef.current[s.id] = el}
+                                  type="file" accept=".pdf,.doc,.docx"
+                                  style={{ display: 'none' }}
+                                  onChange={e => e.target.files[0] && uploadDocumentoAssinado(s.id, e.target.files[0])}
+                                />
+                                <button
+                                  onClick={() => assinadoRef.current[s.id]?.click()}
+                                  disabled={uploadando === `${s.id}-assinado`}
+                                  title="Anexe o documento assinado por todas as partes para poder aprovar"
+                                  style={{ ...styles.btnAcaoTexto, background: '#eff6ff', color: '#1d4ed8' }}>
+                                  {uploadando === `${s.id}-assinado` ? '⏳ Enviando...' : '📎 Anexar Assinado'}
+                                </button>
+                              </>
+                            )
+                          )}
+
+                          {/* Aprovar / Recusar — admin, status enviado, exige documento assinado */}
                           {isAdmin && s.status === 'enviado' && (
                             <>
-                              <button onClick={() => aprovar(s.id)} disabled={processando === s.id}
-                                style={{ ...styles.btnAcaoTexto, background: '#dcfce7', color: '#166534' }}>
+                              <button
+                                onClick={() => s.anexo_assinado_url ? aprovar(s.id) : alert('Anexe o documento assinado antes de aprovar.')}
+                                disabled={processando === s.id}
+                                title={s.anexo_assinado_url ? 'Aprovar solicitação' : 'Anexe o documento assinado primeiro'}
+                                style={{
+                                  ...styles.btnAcaoTexto,
+                                  background: s.anexo_assinado_url ? '#dcfce7' : '#f3f4f6',
+                                  color: s.anexo_assinado_url ? '#166534' : '#9ca3af',
+                                  cursor: s.anexo_assinado_url ? 'pointer' : 'not-allowed',
+                                }}>
                                 {processando === s.id ? '...' : '✓ Aprovar'}
                               </button>
                               <button onClick={() => recusar(s.id)} disabled={processando === s.id}
@@ -280,6 +335,7 @@ export default function PassagensDiarias({ perfilUsuario }) {
                               </button>
                             </>
                           )}
+
                           {/* Cancelar solicitação — status enviado */}
                           {s.status === 'enviado' && (
                             <button onClick={() => cancelarSolicitacao(s.id)} disabled={processando === s.id}
@@ -287,6 +343,7 @@ export default function PassagensDiarias({ perfilUsuario }) {
                               🚫 Cancelar
                             </button>
                           )}
+
                           {/* Cancelar aprovação — admin, status aguardando_prestacao */}
                           {isAdmin && s.status === 'aguardando_prestacao' && (
                             <button onClick={() => cancelarAprovacao(s.id)} disabled={processando === s.id}
