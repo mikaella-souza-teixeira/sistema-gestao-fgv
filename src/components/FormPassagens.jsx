@@ -452,56 +452,13 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
         <h2 style={styles.titulo}>{isEdicao ? 'Editar Solicitação' : 'Nova Solicitação'}</h2>
         <div style={styles.acoesHeader}>
           <button onClick={() => salvar('rascunho')} disabled={salvando} style={styles.btnRascunho}>
-            {salvando ? 'Salvando...' : '💾 Salvar Rascunho'}
+            {salvando ? 'Salvando...' : '💾 Salvar'}
           </button>
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => {
-                if (form.beneficiarios.length === 1) {
-                  gerarDoc(null)
-                } else {
-                  setBenefSelecionados(form.beneficiarios.map((_, i) => i))
-                  setPainelGerar(p => !p)
-                }
-              }}
-              disabled={gerando}
-              style={styles.btnGerar}>
-              {gerando ? 'Gerando...' : '📄 Gerar Word'}
-            </button>
-            {/* Painel de seleção de beneficiários */}
-            {painelGerar && (
-              <div style={styles.painelGerarBox}>
-                <p style={{ fontSize: '13px', fontWeight: '700', color: '#111827', margin: '0 0 10px 0' }}>
-                  Gerar Word para quais viajantes?
-                </p>
-                {form.beneficiarios.map((b, i) => (
-                  <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', cursor: 'pointer', fontSize: '13px', color: '#374151' }}>
-                    <input
-                      type="checkbox"
-                      checked={benefSelecionados.includes(i)}
-                      onChange={e => setBenefSelecionados(prev =>
-                        e.target.checked ? [...prev, i] : prev.filter(x => x !== i)
-                      )}
-                      style={{ width: '16px', height: '16px', accentColor: '#1a4731' }}
-                    />
-                    {b.nome_completo || `Viajante ${i + 1}`}
-                  </label>
-                ))}
-                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                  <button
-                    onClick={() => gerarDoc(benefSelecionados)}
-                    disabled={benefSelecionados.length === 0 || gerando}
-                    style={{ ...styles.btnGerar, flex: 1, fontSize: '13px', padding: '8px 12px' }}>
-                    {gerando ? 'Gerando...' : `📄 Gerar (${benefSelecionados.length})`}
-                  </button>
-                  <button onClick={() => setPainelGerar(false)}
-                    style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '13px' }}>
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <button
+            onClick={() => { adicionarViajante(); setAba(0) }}
+            style={styles.btnAdicionarHeader}>
+            + Adicionar Viajante
+          </button>
         </div>
       </div>
 
@@ -926,8 +883,12 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
       <div style={styles.navegacao}>
         {aba > 0 && <button onClick={() => setAba(a => a - 1)} style={styles.btnNav}>← Anterior</button>}
         <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
+          <button onClick={() => salvar('rascunho')} disabled={salvando} style={styles.btnNav}>
+            {salvando ? 'Salvando...' : '💾 Salvar'}
+          </button>
           {aba < abas.length - 1 && <button onClick={() => setAba(a => a + 1)} style={styles.btnNavPrimario}>Próximo →</button>}
           {aba === abas.length - 1 && (
+            <div style={{ position: 'relative' }}>
             <button
               onClick={() => {
                 if (form.beneficiarios.length === 1) {
@@ -935,14 +896,42 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
                 } else {
                   setBenefSelecionados(form.beneficiarios.map((_, i) => i))
                   setPainelGerar(p => !p)
-                  // Scroll para o painel no topo
-                  window.scrollTo({ top: 0, behavior: 'smooth' })
                 }
               }}
               disabled={gerando}
               style={styles.btnGerar}>
               {gerando ? 'Gerando...' : '📄 Gerar Documento(s) Word'}
             </button>
+            {/* Painel de seleção */}
+            {painelGerar && (
+              <div style={{ ...styles.painelGerarBox, bottom: '110%', top: 'auto' }}>
+                <p style={{ fontSize: '13px', fontWeight: '700', color: '#111827', margin: '0 0 10px 0' }}>
+                  Gerar Word para quais viajantes?
+                </p>
+                {form.beneficiarios.map((b, i) => (
+                  <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', cursor: 'pointer', fontSize: '13px', color: '#374151' }}>
+                    <input type="checkbox" checked={benefSelecionados.includes(i)}
+                      onChange={e => setBenefSelecionados(prev =>
+                        e.target.checked ? [...prev, i] : prev.filter(x => x !== i)
+                      )}
+                      style={{ width: '16px', height: '16px', accentColor: '#1a4731' }} />
+                    {b.nome_completo || `Viajante ${i + 1}`}
+                  </label>
+                ))}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                  <button onClick={() => gerarDoc(benefSelecionados)}
+                    disabled={benefSelecionados.length === 0 || gerando}
+                    style={{ ...styles.btnGerar, flex: 1, fontSize: '13px', padding: '8px 12px' }}>
+                    {gerando ? 'Gerando...' : `📄 Gerar (${benefSelecionados.length})`}
+                  </button>
+                  <button onClick={() => setPainelGerar(false)}
+                    style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '13px' }}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+            </div>
           )}
         </div>
       </div>
@@ -965,6 +954,7 @@ const styles = {
   titulo: { fontSize: '20px', fontWeight: '700', color: '#111827', margin: 0, flex: 1 },
   acoesHeader: { display: 'flex', gap: '10px' },
   btnRascunho: { padding: '9px 16px', borderRadius: '8px', border: '1.5px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '500' },
+  btnAdicionarHeader: { padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#1a4731', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600' },
   btnGerar: { padding: '9px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #1a4731, #2d7a4f)', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600' },
   btnSalvarProximo: { padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#1e40af', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600' },
   painelGerarBox: { position: 'absolute', top: '110%', right: 0, zIndex: 300, background: 'white', border: '1.5px solid #1a4731', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '16px 20px', minWidth: '280px' },

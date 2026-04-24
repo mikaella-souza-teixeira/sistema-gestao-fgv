@@ -43,6 +43,7 @@ export default function PassagensDiarias({ perfilUsuario }) {
   const [processando, setProcessando] = useState(null)
   const [uploadando, setUploadando] = useState(null)
   const [grupoAberto, setGrupoAberto] = useState(null)
+  const [confirmarExcluir, setConfirmarExcluir] = useState(null) // { id, nome }
   const declaracaoRef = useRef({})
   const relatorioRef = useRef({})
   const assinadoRef   = useRef({})
@@ -125,9 +126,9 @@ export default function PassagensDiarias({ perfilUsuario }) {
   }
 
   const deletar = async (id) => {
-    if (!confirm('Excluir esta solicitação permanentemente? Esta ação não pode ser desfeita.')) return
     setProcessando(id)
     await supabase.from('passagens_diarias').delete().eq('id', id)
+    setConfirmarExcluir(null)
     await carregar()
     setProcessando(null)
   }
@@ -187,12 +188,31 @@ export default function PassagensDiarias({ perfilUsuario }) {
 
   if (formAberto) {
     return (
-      <FormPassagens
-        solicitacao={selecionada}
-        perfilUsuario={perfilUsuario}
-        onVoltar={fechar}
-        onSalvar={aoSalvar}
-      />
+      <>
+        {confirmarExcluir && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalBox}>
+              <p style={styles.modalTitulo}>🗑️ Excluir solicitação?</p>
+              <p style={styles.modalDesc}>
+                Esta ação não pode ser desfeita. A solicitação de <strong>{confirmarExcluir.nome}</strong> será removida permanentemente.
+              </p>
+              <div style={styles.modalBotoes}>
+                <button onClick={() => setConfirmarExcluir(null)} style={styles.modalBtnCancelar}>Cancelar</button>
+                <button onClick={() => deletar(confirmarExcluir.id)} disabled={processando === confirmarExcluir.id}
+                  style={styles.modalBtnExcluir}>
+                  {processando === confirmarExcluir.id ? 'Excluindo...' : 'Sim, excluir'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <FormPassagens
+          solicitacao={selecionada}
+          perfilUsuario={perfilUsuario}
+          onVoltar={fechar}
+          onSalvar={aoSalvar}
+        />
+      </>
     )
   }
 
@@ -206,6 +226,25 @@ export default function PassagensDiarias({ perfilUsuario }) {
 
   return (
     <div>
+      {/* Modal de confirmação de exclusão */}
+      {confirmarExcluir && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalBox}>
+            <p style={styles.modalTitulo}>🗑️ Excluir solicitação?</p>
+            <p style={styles.modalDesc}>
+              Esta ação não pode ser desfeita. A solicitação de <strong>{confirmarExcluir.nome}</strong> será removida permanentemente.
+            </p>
+            <div style={styles.modalBotoes}>
+              <button onClick={() => setConfirmarExcluir(null)} style={styles.modalBtnCancelar}>Cancelar</button>
+              <button onClick={() => deletar(confirmarExcluir.id)} disabled={processando === confirmarExcluir.id}
+                style={styles.modalBtnExcluir}>
+                {processando === confirmarExcluir.id ? 'Excluindo...' : 'Sim, excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={styles.topBar}>
         <div>
           <h2 style={styles.titulo}>Passagens e Diárias</h2>
@@ -360,7 +399,12 @@ export default function PassagensDiarias({ perfilUsuario }) {
                               </button>
                             )}
                             {(s.status === 'rascunho' || s.status === 'cancelado') && (
-                              <button onClick={() => deletar(s.id)} disabled={processando === s.id}
+                              <button
+                                onClick={() => setConfirmarExcluir({
+                                  id: s.id,
+                                  nome: (s.dados?.beneficiarios?.[0]?.nome_completo || s.dados?.nome_completo || 'este grupo'),
+                                })}
+                                disabled={processando === s.id}
                                 style={{ ...styles.btnAcaoTexto, background: '#fee2e2', color: '#991b1b' }}>
                                 🗑️ Excluir
                               </button>
@@ -412,30 +456,25 @@ export default function PassagensDiarias({ perfilUsuario }) {
                                           {valorBenef > 0 ? `R$ ${formatarMoeda(valorBenef)}` : '—'}
                                         </p>
                                       </div>
-                                      {s.status === 'enviado' && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                          <input
-                                            ref={el => assinadoRef.current[chaveUpload] = el}
-                                            type="file" accept=".pdf,.doc,.docx"
-                                            style={{ display: 'none' }}
-                                            onChange={e => e.target.files[0] && uploadDocumentoAssinado(s.id, bIdx, e.target.files[0])}
-                                          />
-                                          <button
-                                            onClick={() => assinadoRef.current[chaveUpload]?.click()}
-                                            disabled={uploadando === chaveUpload}
-                                            style={{ ...styles.btnAcaoTexto, background: urlBenef ? '#f0fdf4' : '#eff6ff', color: urlBenef ? '#166534' : '#1d4ed8' }}>
-                                            {uploadando === chaveUpload ? '⏳ Enviando...' : urlBenef ? '✅ Requisição incluída' : '📎 Incluir requisição'}
-                                          </button>
-                                          {urlBenef && (
-                                            <a href={urlBenef} target="_blank" rel="noreferrer"
-                                              style={{ fontSize: '12px', color: '#166534', fontWeight: '600' }}>ver</a>
-                                          )}
-                                        </div>
-                                      )}
-                                      {s.status !== 'enviado' && urlBenef && (
-                                        <a href={urlBenef} target="_blank" rel="noreferrer"
-                                          style={{ fontSize: '12px', color: '#166534', fontWeight: '600' }}>📄 ver requisição</a>
-                                      )}
+                                      {/* Incluir requisição — visível em qualquer status */}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <input
+                                          ref={el => assinadoRef.current[chaveUpload] = el}
+                                          type="file" accept=".pdf,.doc,.docx"
+                                          style={{ display: 'none' }}
+                                          onChange={e => e.target.files[0] && uploadDocumentoAssinado(s.id, bIdx, e.target.files[0])}
+                                        />
+                                        <button
+                                          onClick={() => assinadoRef.current[chaveUpload]?.click()}
+                                          disabled={uploadando === chaveUpload}
+                                          style={{ ...styles.btnAcaoTexto, background: urlBenef ? '#f0fdf4' : '#eff6ff', color: urlBenef ? '#166534' : '#1d4ed8' }}>
+                                          {uploadando === chaveUpload ? '⏳ Enviando...' : urlBenef ? '✅ Requisição incluída' : '📎 Incluir requisição'}
+                                        </button>
+                                        {urlBenef && (
+                                          <a href={urlBenef} target="_blank" rel="noreferrer"
+                                            style={{ fontSize: '12px', color: '#166534', fontWeight: '600' }}>ver</a>
+                                        )}
+                                      </div>
                                     </div>
                                   )
                                 })}
@@ -636,4 +675,12 @@ const styles = {
   btnUploadDoc: { padding: '8px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #1a4731, #2d7a4f)', color: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
   btnFecharPainel: { padding: '8px 14px', borderRadius: '8px', border: '1px solid #d1d5db', background: 'white', color: '#6b7280', fontSize: '12px', cursor: 'pointer', marginLeft: 'auto' },
   painelAviso: { fontSize: '12px', color: '#92400e', background: '#fef3c7', padding: '8px 12px', borderRadius: '6px', margin: 0 },
+  // Modal de confirmação
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  modalBox: { background: 'white', borderRadius: '16px', padding: '32px 28px', maxWidth: '420px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' },
+  modalTitulo: { fontSize: '18px', fontWeight: '700', color: '#111827', margin: '0 0 12px 0' },
+  modalDesc: { fontSize: '14px', color: '#6b7280', margin: '0 0 24px 0', lineHeight: '1.5' },
+  modalBotoes: { display: 'flex', gap: '10px', justifyContent: 'flex-end' },
+  modalBtnCancelar: { padding: '10px 20px', borderRadius: '8px', border: '1.5px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '500' },
+  modalBtnExcluir: { padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#dc2626', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600' },
 }
