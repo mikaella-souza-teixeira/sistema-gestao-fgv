@@ -114,6 +114,7 @@ const VIAJANTE_VAZIO = {
   endereco: '', cep: '', complemento_bairro: '', cidade_estado: '',
   banco: '', codigo_banco: '', agencia_numero: '', agencia_digito: '',
   conta_numero: '', conta_digito: '',
+  diarias: { meia_diaria_deslocamento: 'nao' },
 }
 
 function diasEntreDatas(de, ate) {
@@ -151,8 +152,7 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
     // Hospedagem
     hospedagem_local: '', hospedagem_entrada: '', hospedagem_saida: '',
     hospedagem_tipo: 'Café da manhã', hospedagem_valor: '',
-    // Diárias
-    diarias: { meia_diaria_deslocamento: 'nao' },
+    // Diárias: agora por beneficiário (dentro de cada item de beneficiarios[])
   })
 
   useEffect(() => {
@@ -160,18 +160,25 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
       const d = solicitacao.dados
       // Compatibilidade: solicitações antigas têm campos planos, não array
       if (d.beneficiarios) {
-        setForm(prev => ({ ...prev, ...d }))
+        // Garante que cada beneficiário tem diarias (compat. com registros antigos)
+        const diariasPadrao = d.diarias || { meia_diaria_deslocamento: 'nao' }
+        const beneficiarios = d.beneficiarios.map(b => ({
+          ...b,
+          diarias: b.diarias || diariasPadrao,
+        }))
+        setForm(prev => ({ ...prev, ...d, beneficiarios }))
       } else {
         const { nome_completo, cpf, email, telefone, data_nascimento,
           endereco, cep, complemento_bairro, cidade_estado,
           banco, codigo_banco, agencia_numero, agencia_digito,
-          conta_numero, conta_digito, ...resto } = d
+          conta_numero, conta_digito, diarias: diariasPlanar, ...resto } = d
         setForm(prev => ({
           ...prev, ...resto,
           beneficiarios: [{ nome_completo, cpf, email, telefone, data_nascimento,
             endereco, cep, complemento_bairro, cidade_estado,
             banco, codigo_banco, agencia_numero, agencia_digito,
-            conta_numero, conta_digito }],
+            conta_numero, conta_digito,
+            diarias: diariasPlanar || { meia_diaria_deslocamento: 'nao' } }],
         }))
       }
     } else if (perfilUsuario) {
@@ -232,19 +239,28 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
 
   const setDiariaRange = (key, campo, valor) => {
     setForm(f => {
-      const diarias = { ...f.diarias, [`${key}_${campo}`]: valor }
-      if (campo === 'de' || campo === 'ate') {
-        const de  = campo === 'de'  ? valor : (diarias[`${key}_de`]  || '')
-        const ate = campo === 'ate' ? valor : (diarias[`${key}_ate`] || '')
-        const dias = diasEntreDatas(de, ate)
-        if (dias > 0) diarias[`${key}_qtd`] = dias
-      }
-      return { ...f, diarias }
+      const beneficiarios = f.beneficiarios.map((b, i) => {
+        if (i !== viajanteSel) return b
+        const diarias = { ...(b.diarias || {}), [`${key}_${campo}`]: valor }
+        if (campo === 'de' || campo === 'ate') {
+          const de  = campo === 'de'  ? valor : (diarias[`${key}_de`]  || '')
+          const ate = campo === 'ate' ? valor : (diarias[`${key}_ate`] || '')
+          const dias = diasEntreDatas(de, ate)
+          if (dias > 0) diarias[`${key}_qtd`] = dias
+        }
+        return { ...b, diarias }
+      })
+      return { ...f, beneficiarios }
     })
   }
 
   const setDiariaToggle = (key, valor) => {
-    setForm(f => ({ ...f, diarias: { ...f.diarias, [key]: valor } }))
+    setForm(f => {
+      const beneficiarios = f.beneficiarios.map((b, i) =>
+        i === viajanteSel ? { ...b, diarias: { ...(b.diarias || {}), [key]: valor } } : b
+      )
+      return { ...f, beneficiarios }
+    })
   }
 
   const buscarCep = useCallback(async (cep, idx) => {
@@ -374,8 +390,9 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
     setGerando(false)
   }
 
-  const totalDiarias = calcularTotais(form.diarias || {})
-  const totalGeral = totalDiarias + Number(form.passagem_valor || 0) + Number(form.transporte_valor || 0) + Number(form.hospedagem_valor || 0)
+  const totalDiariasViajante = calcularTotais(v.diarias || {})
+  const totalDiariasGrupo   = form.beneficiarios.reduce((acc, b) => acc + calcularTotais(b.diarias || {}), 0)
+  const totalGeral = totalDiariasGrupo + Number(form.passagem_valor || 0) + Number(form.transporte_valor || 0) + Number(form.hospedagem_valor || 0)
 
   const abas = [
     'Viajantes', 'Projeto',
@@ -703,6 +720,23 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
         {/* ── ABA: Diárias ──────────────────────────────────────────────────── */}
         {abas[aba] === 'Diárias' && (
           <div style={styles.secao}>
+            {/* Seletor de viajante quando há mais de um */}
+            {form.beneficiarios.length > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#eff6ff', borderRadius: '8px', marginBottom: '16px', border: '1px solid #bfdbfe' }}>
+                <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: '600' }}>📋 Configurando diárias de:</span>
+                <select
+                  value={viajanteSel}
+                  onChange={e => setViajanteSel(Number(e.target.value))}
+                  style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #93c5fd', fontSize: '13px', fontWeight: '600', color: '#1e3a8a', background: 'white' }}>
+                  {form.beneficiarios.map((b, i) => (
+                    <option key={i} value={i}>{b.nome_completo || `Viajante ${i + 1}`}</option>
+                  ))}
+                </select>
+                <span style={{ fontSize: '12px', color: '#3b82f6' }}>
+                  (cada viajante tem seus próprios valores)
+                </span>
+              </div>
+            )}
             <p style={styles.dica}>📅 Selecione o período de cada tipo de diária. A quantidade é calculada automaticamente.</p>
             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
               <thead>
@@ -717,11 +751,12 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
               </thead>
               <tbody>
                 {DIARIAS_LISTA.map((d, i) => {
+                  const diariasV = v.diarias || {}
                   const isToggle = d.tipo === 'toggle'
-                  const ativo = isToggle ? form.diarias?.[d.key] === 'sim' : false
-                  const de  = form.diarias?.[`${d.key}_de`]  || ''
-                  const ate = form.diarias?.[`${d.key}_ate`] || ''
-                  const qtd = isToggle ? (ativo ? 1 : 0) : Number(form.diarias?.[`${d.key}_qtd`] || 0)
+                  const ativo = isToggle ? diariasV[d.key] === 'sim' : false
+                  const de  = diariasV[`${d.key}_de`]  || ''
+                  const ate = diariasV[`${d.key}_ate`] || ''
+                  const qtd = isToggle ? (ativo ? 1 : 0) : Number(diariasV[`${d.key}_qtd`] || 0)
                   const total = qtd * d.valor
 
                   return (
@@ -773,13 +808,19 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
 
             <div style={styles.resumo}>
               {form.tem_passagem === 'sim' && (
-                <div style={styles.resumoLinha}><span>Passagem aérea</span><span>R$ {formatarMoeda(Number(form.passagem_valor || 0))}</span></div>
+                <div style={styles.resumoLinha}><span>Passagem aérea (grupo)</span><span>R$ {formatarMoeda(Number(form.passagem_valor || 0))}</span></div>
               )}
-              <div style={styles.resumoLinha}><span>Transporte</span><span>R$ {formatarMoeda(Number(form.transporte_valor || 0))}</span></div>
-              <div style={styles.resumoLinha}><span>Hospedagem</span><span>R$ {formatarMoeda(Number(form.hospedagem_valor || 0))}</span></div>
-              <div style={styles.resumoLinha}><span>Diárias</span><span>R$ {formatarMoeda(totalDiarias)}</span></div>
+              <div style={styles.resumoLinha}><span>Transporte (grupo)</span><span>R$ {formatarMoeda(Number(form.transporte_valor || 0))}</span></div>
+              <div style={styles.resumoLinha}><span>Hospedagem (grupo)</span><span>R$ {formatarMoeda(Number(form.hospedagem_valor || 0))}</span></div>
+              <div style={styles.resumoLinha}>
+                <span>Diárias de {v.nome_completo || `Viajante ${viajanteSel + 1}`}</span>
+                <span>R$ {formatarMoeda(totalDiariasViajante)}</span>
+              </div>
+              {form.beneficiarios.length > 1 && (
+                <div style={styles.resumoLinha}><span>Diárias de todos (soma)</span><span>R$ {formatarMoeda(totalDiariasGrupo)}</span></div>
+              )}
               <div style={{ ...styles.resumoLinha, ...styles.resumoTotal }}>
-                <span>TOTAL GERAL (por viajante)</span><span>R$ {formatarMoeda(totalGeral)}</span>
+                <span>TOTAL GERAL DO GRUPO</span><span>R$ {formatarMoeda(totalGeral)}</span>
               </div>
             </div>
           </div>

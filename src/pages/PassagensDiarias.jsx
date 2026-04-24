@@ -268,7 +268,9 @@ export default function PassagensDiarias({ perfilUsuario }) {
                   const d = s.dados || {}
                   const cor = STATUS_COR[s.status] || STATUS_COR.rascunho
                   const bg  = s.urgente ? '#fff5f5' : sIdx % 2 === 0 ? '#fff' : '#f9fafb'
-                  const totalValor = calcularTotais(d.diarias || {})
+                  // Soma as diárias de cada beneficiário individualmente
+                  const totalValor = beneficiarios.reduce((acc, b) =>
+                    acc + calcularTotais(b.diarias || d.diarias || {}), 0)
                     + Number(d.passagem_valor || 0)
                     + Number(d.transporte_valor || 0)
                     + Number(d.hospedagem_valor || 0)
@@ -379,6 +381,15 @@ export default function PassagensDiarias({ perfilUsuario }) {
                                 {beneficiarios.map((b, bIdx) => {
                                   const urlBenef = (s.anexos_assinados || {})[String(bIdx)]
                                   const chaveUpload = `${s.id}-${bIdx}`
+                                  // Valor individual do beneficiário
+                                  const valorBenef = calcularTotais(b.diarias || d.diarias || {})
+                                  // Período: menor data de início e maior data de fim das diárias
+                                  const diariasBenef = b.diarias || d.diarias || {}
+                                  const datasInicio = Object.keys(diariasBenef).filter(k => k.endsWith('_de')).map(k => diariasBenef[k]).filter(Boolean).sort()
+                                  const datasFim    = Object.keys(diariasBenef).filter(k => k.endsWith('_ate')).map(k => diariasBenef[k]).filter(Boolean).sort()
+                                  const periodoInicio = datasInicio[0] ? fmtData(datasInicio[0]) : null
+                                  const periodoFim    = datasFim[datasFim.length - 1] ? fmtData(datasFim[datasFim.length - 1]) : null
+
                                   return (
                                     <div key={bIdx} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: 'white', borderRadius: '8px', border: '1px solid #d1fae5' }}>
                                       <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: '#1a4731', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700', flexShrink: 0 }}>
@@ -389,6 +400,17 @@ export default function PassagensDiarias({ perfilUsuario }) {
                                           {b.nome_completo || '—'}
                                         </p>
                                         {b.cpf && <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>CPF: {b.cpf}</p>}
+                                      </div>
+                                      {/* Período e valor individual */}
+                                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                        {periodoInicio && (
+                                          <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 2px 0' }}>
+                                            {periodoInicio}{periodoFim && periodoFim !== periodoInicio ? ` → ${periodoFim}` : ''}
+                                          </p>
+                                        )}
+                                        <p style={{ fontSize: '13px', fontWeight: '700', color: valorBenef > 0 ? '#166534' : '#9ca3af', margin: 0 }}>
+                                          {valorBenef > 0 ? `R$ ${formatarMoeda(valorBenef)}` : '—'}
+                                        </p>
                                       </div>
                                       {s.status === 'enviado' && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
