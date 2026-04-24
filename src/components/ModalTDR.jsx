@@ -92,7 +92,7 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
 
   // ── form principal ─────────────────────────────────────────────────────────
   const [form, setForm] = useState({
-    numero: '', numero_demanda: '', linhas_poa: '', componente: '', tipo: 'PF',
+    numero: '', numero_demanda: '', linhas_poa: '', componente: '', tipo: 'pf',
     objeto: '', descricao: '', prazo_limite: '', observacoes: '',
     valor_brl: '', valor_usd: '',
   })
@@ -135,7 +135,7 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
         numero_demanda: tdr.numero_demanda || '',
         linhas_poa:     tdr.linhas_poa     || '',
         componente:     tdr.componente     || '',
-        tipo:           tdr.tipo           || 'PF',
+        tipo:           tdr.tipo           || 'pf',
         objeto:         tdr.objeto         || '',
         descricao:      tdr.descricao      || '',
         prazo_limite:   tdr.prazo_limite   || '',
@@ -551,8 +551,8 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
                 </Campo>
                 <Campo label="Tipo">
                   <select style={st.input} value={form.tipo} onChange={e => set('tipo', e.target.value)}>
-                    <option value="PF">Pessoa Física (PF)</option>
-                    <option value="PJ">Pessoa Jurídica (PJ)</option>
+                    <option value="pf">Pessoa Física (PF)</option>
+                    <option value="pj">Pessoa Jurídica (PJ)</option>
                   </select>
                 </Campo>
               </div>
@@ -632,6 +632,10 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
           {/* ════════ ABA: HISTÓRICO ════════ */}
           {abaAtiva === 'historico' && (
             <div style={st.form}>
+
+              {!isEdicao ? (
+                <p style={st.vazio}>Salve a contratação primeiro para registrar movimentações.</p>
+              ) : (<>
 
               {/* Botão avançar para Aquisições */}
               {isEdicao && etapa === 'tdr' && (
@@ -757,6 +761,7 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
                   </button>
                 </div>
               </div>
+              </>)}
             </div>
           )}
 
