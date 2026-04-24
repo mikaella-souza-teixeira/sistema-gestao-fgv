@@ -47,7 +47,7 @@ export default function Aquisicoes({ perfilUsuario }) {
   const carregar = async () => {
     setCarregando(true)
     const [{ data: aq }, { data: un }] = await Promise.all([
-      supabase.from('aquisicoes').select('*, unidade:unidades(nome, instituicao)').order('created_at', { ascending: false }),
+      supabase.from('aquisicoes').select('*, unidade:unidades(nome, instituicao), tdr:tdrs(numero, numero_demanda, objeto)').order('created_at', { ascending: false }),
       supabase.from('unidades').select('*').order('nome'),
     ])
     setAquisicoes(aq || [])
@@ -191,6 +191,11 @@ export default function Aquisicoes({ perfilUsuario }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, flexWrap: 'wrap' }}>
                     {a.urgente && <span style={styles.urgenteTag}>🚨 URGENTE</span>}
                     <span style={styles.demanda}>{a.numero_demanda || 'Sem demanda'}</span>
+                    {a.tdr && (
+                      <span style={{ ...styles.badge, background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0' }}>
+                        📝 TDR: {a.tdr.numero || a.tdr.numero_demanda || 'Vinculado'}
+                      </span>
+                    )}
                     <span style={{ ...styles.badge, background: corTipo.bg, color: corTipo.cor }}>{corTipo.label}</span>
                     <span style={{ ...styles.badge, background: corStatus.bg, color: corStatus.cor }}>{corStatus.label}</span>
                     {a.unidade && <span style={styles.uo}>{a.unidade.nome}</span>}

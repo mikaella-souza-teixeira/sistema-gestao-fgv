@@ -57,7 +57,7 @@ function PainelExecucao({ setModuloAtivo }) {
   const emAndamento = [
     ...diarias.filter(d => STATUS_ATIVOS_PD.includes(d.status)).map(d => ({ ...d, modulo: 'Diárias' })),
     ...aquisicoes.filter(a => STATUS_ATIVOS_AQ.includes(a.status)).map(a => ({ ...a, modulo: 'Aquisições' })),
-    ...tdrs.filter(t => STATUS_ATIVOS_TDR.includes(t.status)).map(t => ({ ...t, modulo: 'TDRs' })),
+    ...tdrs.filter(t => STATUS_ATIVOS_TDR.includes(t.status)).map(t => ({ ...t, modulo: 'Contratações' })),
   ]
 
   const parados = emAndamento.filter(i => agora - new Date(i.updated_at).getTime() > sete)
@@ -65,7 +65,7 @@ function PainelExecucao({ setModuloAtivo }) {
   const urgentes = [
     ...diarias.filter(d => d.urgente).map(d => ({ ...d, modulo: 'Diárias' })),
     ...aquisicoes.filter(a => a.urgente).map(a => ({ ...a, modulo: 'Aquisições' })),
-    ...tdrs.filter(t => t.urgente).map(t => ({ ...t, modulo: 'TDRs' })),
+    ...tdrs.filter(t => t.urgente).map(t => ({ ...t, modulo: 'Contratações' })),
   ]
 
   const saldoDisponivel = orcamento - totalExecutado
@@ -77,8 +77,8 @@ function PainelExecucao({ setModuloAtivo }) {
     const dias = Math.floor(diff / (1000 * 60 * 60 * 24))
     return dias === 0 ? 'hoje' : `${dias}d atrás`
   }
-  const MODULO_NAV = { 'Diárias': 'passagens', 'Aquisições': 'aquisicoes', 'TDRs': 'tdrs' }
-  const MODULO_COR = { 'Diárias': '#2d7a4f', 'Aquisições': '#b45309', 'TDRs': '#1d4ed8' }
+  const MODULO_NAV = { 'Diárias': 'passagens', 'Aquisições': 'aquisicoes', 'Contratações': 'tdrs' }
+  const MODULO_COR = { 'Diárias': '#2d7a4f', 'Aquisições': '#b45309', 'Contratações': '#1d4ed8' }
 
   if (carregando) return <p style={{ textAlign:'center', padding:'60px', color:'#6b7280' }}>Carregando...</p>
 
@@ -229,7 +229,7 @@ const ep = {
 
 const modulos = [
   { id: 'passagens',  nome: 'Passagens e Diárias', icone: '✈️', descricao: 'Solicitações de passagens aéreas e diárias', cor: '#2d7a4f' },
-  { id: 'tdrs',       nome: 'TDRs',                icone: '📄', descricao: 'Termos de Referência',                        cor: '#1d4ed8' },
+  { id: 'tdrs',       nome: 'Contratações',        icone: '📄', descricao: 'TDRs, contratos e produtos',                  cor: '#1d4ed8' },
   { id: 'aquisicoes', nome: 'Aquisições',           icone: '🛒', descricao: 'Processos de aquisição',                      cor: '#b45309' },
   { id: 'financeiro', nome: 'Financeiro',           icone: '💰', descricao: 'Orçamento e execução financeira',             cor: '#7c3aed' },
   { id: 'relatorios', nome: 'Relatórios',      icone: '📊', descricao: 'Exportar e imprimir relatórios',   cor: '#0f766e' },
