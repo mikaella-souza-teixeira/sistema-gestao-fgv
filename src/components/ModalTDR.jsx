@@ -455,11 +455,10 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
   })
 
   const abas = [
-    { key: 'geral',          label: '📋 Geral' },
-    { key: 'documentos',     label: `📁 Documentos${docs.length ? ` (${docs.length})` : ''}` },
-    { key: 'movimentacoes',  label: `📤 Movimentações${movs.length ? ` (${movs.length})` : ''}` },
-    { key: 'contrato',       label: '📑 Contrato' },
-    { key: 'produtos',       label: `📦 Produtos${produtos.length ? ` (${produtos.length})` : ''}` },
+    { key: 'geral',         label: '📋 Geral' },
+    { key: 'contrato',      label: '📑 Contrato' },
+    { key: 'produtos',      label: `📦 Produtos${produtos.length ? ` (${produtos.length})` : ''}` },
+    { key: 'historico',     label: `📜 Histórico${movs.length ? ` (${movs.length})` : ''}` },
   ]
 
   // ── render ────────────────────────────────────────────────────────────────
@@ -630,107 +629,8 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
             </div>
           )}
 
-          {/* ════════ ABA: DOCUMENTOS ════════ */}
-          {abaAtiva === 'documentos' && (
-            <div style={st.form}>
-              {!isEdicao ? (
-                <p style={st.vazio}>Salve a contratação primeiro para adicionar documentos.</p>
-              ) : (
-                <>
-                  {/* Histórico por tipo */}
-                  {Object.entries(TIPOS_DOC).map(([tipo, info]) => {
-                    const versoes = docsPorTipo[tipo] || []
-                    return (
-                      <div key={tipo} style={st.docGrupo}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                          <span style={{ ...st.docTipoTag, background: info.bg, color: info.cor }}>
-                            {info.icon} {info.label}
-                          </span>
-                          <span style={{ fontSize: '12px', color: '#9ca3af' }}>
-                            {versoes.length === 0 ? 'Nenhuma versão' : `${versoes.length} versão(ões)`}
-                          </span>
-                        </div>
-                        {versoes.length === 0 ? (
-                          <p style={{ fontSize: '13px', color: '#9ca3af', margin: '0 0 4px' }}>Nenhum documento enviado.</p>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {versoes.map(v => (
-                              <div key={v.id} style={st.docVersao}>
-                                <div style={{ flex: 1 }}>
-                                  <span style={st.versaoBadge}>v{v.versao_numero}</span>
-                                  <span style={{ fontWeight: '600', fontSize: '13px', color: '#111827' }}>
-                                    {v.nome_versao || `Versão ${v.versao_numero}`}
-                                  </span>
-                                  <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '8px' }}>
-                                    📅 {fmtData(v.data_inclusao || v.created_at)}
-                                  </span>
-                                  {v.observacoes && (
-                                    <p style={{ margin: '3px 0 0', fontSize: '12px', color: '#6b7280' }}>{v.observacoes}</p>
-                                  )}
-                                </div>
-                                {v.arquivo_url && (
-                                  <div style={{ display: 'flex', gap: '6px' }}>
-                                    <a href={v.arquivo_url} target="_blank" rel="noreferrer" style={st.btnLink}>👁️ Ver</a>
-                                    <button
-                                      onClick={() => downloadArquivo(v.arquivo_url, `${tipo}_v${v.versao_numero}.pdf`)}
-                                      style={st.btnLink}>⬇️ Baixar</button>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-
-                  {/* Formulário: nova versão de documento */}
-                  <div style={st.novaMovCard}>
-                    <h4 style={st.novaMovTitulo}>+ Adicionar nova versão de documento</h4>
-                    <div style={st.grid2}>
-                      <Campo label="Tipo de documento">
-                        <select style={st.input} value={novoDoc.tipo} onChange={e => setDoc('tipo', e.target.value)}>
-                          {Object.entries(TIPOS_DOC).map(([k, v]) => (
-                            <option key={k} value={k}>{v.icon} {v.label}</option>
-                          ))}
-                        </select>
-                      </Campo>
-                      <Campo label="Nome / descrição da versão">
-                        <input style={st.input} value={novoDoc.nome_versao}
-                          onChange={e => setDoc('nome_versao', e.target.value)}
-                          placeholder="Ex: Revisão 1, Após feedback UO..." />
-                      </Campo>
-                    </div>
-                    <div style={st.grid2}>
-                      <Campo label="Data de inclusão (retroativo ok)">
-                        <input style={st.input} type="datetime-local" value={novoDoc.data_inclusao}
-                          onChange={e => setDoc('data_inclusao', e.target.value)} />
-                      </Campo>
-                      <Campo label="Observações">
-                        <input style={st.input} value={novoDoc.observacoes}
-                          onChange={e => setDoc('observacoes', e.target.value)}
-                          placeholder="Ex: Corrigida a seção 3..." />
-                      </Campo>
-                    </div>
-                    <input ref={docRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx"
-                      style={{ display: 'none' }} />
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <button onClick={() => docRef.current?.click()} style={st.btnUploadPeq}
-                        disabled={uploadando === 'doc'}>
-                        {uploadando === 'doc' ? '⏳ Enviando...' : '📎 Selecionar arquivo'}
-                      </button>
-                      <button onClick={salvarDoc} disabled={salvandoDoc} style={{ ...st.btnSalvar, marginLeft: 'auto' }}>
-                        {salvandoDoc ? 'Salvando...' : '+ Adicionar versão'}
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ════════ ABA: MOVIMENTAÇÕES ════════ */}
-          {abaAtiva === 'movimentacoes' && (
+          {/* ════════ ABA: HISTÓRICO ════════ */}
+          {abaAtiva === 'historico' && (
             <div style={st.form}>
 
               {/* Botão avançar para Aquisições */}
@@ -832,7 +732,7 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
                     onChange={e => setMov('observacoes', e.target.value)}
                     placeholder="Cole aqui o conteúdo do e-mail ou descreva o encaminhamento..." />
                 </Campo>
-                <input ref={comprovRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg"
+                <input ref={comprovRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.eml,.msg"
                   style={{ display: 'none' }}
                   onChange={async e => {
                     if (!e.target.files[0]) return
