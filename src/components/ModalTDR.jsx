@@ -589,7 +589,7 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
                   {salvando ? 'Salvando...' : '💾 Salvar'}
                 </button>
                 {!isEdicao && (
-                  <button onClick={onFechar} style={st.btnSecundario}>Cancelar</button>
+                  <button onClick={onVoltar} style={st.btnSecundario}>Cancelar</button>
                 )}
               </div>
             </div>
