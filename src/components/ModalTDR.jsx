@@ -48,7 +48,7 @@ function fmtDataSimples(iso) {
 }
 
 // ── componente principal ───────────────────────────────────────────────────────
-export default function ModalTDR({ tdr, perfilUsuario, onFechar, onSalvar }) {
+export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
   const isEdicao = !!tdr
   const [abaAtiva,   setAbaAtiva]   = useState('geral')
   const [salvando,   setSalvando]   = useState(false)
@@ -431,75 +431,77 @@ export default function ModalTDR({ tdr, perfilUsuario, onFechar, onSalvar }) {
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div style={st.overlay} onClick={e => e.target === e.currentTarget && onFechar()}>
-      <div style={st.modal}>
+    <div style={st.pagina}>
 
-        {/* ── Cabeçalho ── */}
-        <div style={st.cabecalho}>
-          <div style={{ flex: 1 }}>
-            <h2 style={st.titulo}>{form.numero || 'Nova Contratação'}</h2>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
-              {form.numero_demanda && (
-                <span style={st.tagDemanda}>📋 {form.numero_demanda}</span>
-              )}
-              <span style={st.tagTipo}>{form.tipo}</span>
-              {ultimaMov && (
-                <span style={{ ...st.tagStatus, background: TIPO_ACAO[ultimaMov.tipo]?.bg, color: TIPO_ACAO[ultimaMov.tipo]?.cor }}>
-                  {TIPO_ACAO[ultimaMov.tipo]?.icone} Com: <strong>{ultimaMov.para}</strong>
-                </span>
-              )}
-              {contrato?.status && (
-                <span style={{ ...st.tagStatus, background: STATUS_CONTRATO[contrato.status]?.bg, color: STATUS_CONTRATO[contrato.status]?.cor }}>
-                  📑 {STATUS_CONTRATO[contrato.status]?.label}
-                </span>
-              )}
-            </div>
-
-            {/* Barra de etapas */}
-            {isEdicao && (
-              <div style={st.etapasBar}>
-                {ETAPAS.map((e, i) => {
-                  const idx     = ETAPAS.findIndex(x => x.key === etapa)
-                  const feito   = i < idx
-                  const ativo   = e.key === etapa
-                  return (
-                    <div key={e.key} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: '4px',
-                        padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700',
-                        background: ativo ? '#1a4731' : feito ? '#d1fae5' : '#f3f4f6',
-                        color:      ativo ? '#fff'    : feito ? '#166534' : '#9ca3af',
-                      }}>
-                        {feito ? '✓' : e.icon} {e.label}
-                      </div>
-                      {i < ETAPAS.length - 1 && (
-                        <span style={{ color: '#d1d5db', fontSize: '12px' }}>›</span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+      {/* ── Barra superior (igual ao FormPassagens) ── */}
+      <div style={st.cabecalho}>
+        <button onClick={onVoltar} style={st.btnVoltar}>← Voltar</button>
+        <div style={{ flex: 1 }}>
+          <h2 style={st.titulo}>{form.numero || (isEdicao ? 'Contratação' : 'Nova Contratação')}</h2>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+            {form.numero_demanda && (
+              <span style={st.tagDemanda}>📋 {form.numero_demanda}</span>
+            )}
+            <span style={st.tagTipo}>{form.tipo}</span>
+            {ultimaMov && (
+              <span style={{ ...st.tagStatus, background: TIPO_ACAO[ultimaMov.tipo]?.bg, color: TIPO_ACAO[ultimaMov.tipo]?.cor }}>
+                {TIPO_ACAO[ultimaMov.tipo]?.icone} Com: <strong>{ultimaMov.para}</strong>
+              </span>
+            )}
+            {contrato?.status && (
+              <span style={{ ...st.tagStatus, background: STATUS_CONTRATO[contrato.status]?.bg, color: STATUS_CONTRATO[contrato.status]?.cor }}>
+                📑 {STATUS_CONTRATO[contrato.status]?.label}
+              </span>
             )}
           </div>
-          <button onClick={onFechar} style={st.btnFechar}>✕</button>
         </div>
+        <button onClick={salvar} disabled={salvando} style={st.btnSalvarTopo}>
+          {salvando ? 'Salvando...' : '💾 Salvar'}
+        </button>
+      </div>
 
-        {erro && <div style={st.erro}>{erro}</div>}
-
-        {/* ── Abas ── */}
-        <div style={st.abas}>
-          {abas.map(a => (
-            <button key={a.key} onClick={() => setAbaAtiva(a.key)} style={{
-              ...st.aba,
-              borderBottom: abaAtiva === a.key ? '2px solid #1a4731' : '2px solid transparent',
-              color:      abaAtiva === a.key ? '#1a4731' : '#6b7280',
-              fontWeight: abaAtiva === a.key ? '700' : '400',
-            }}>{a.label}</button>
-          ))}
+      {/* Barra de etapas */}
+      {isEdicao && (
+        <div style={st.etapasBar}>
+          {ETAPAS.map((e, i) => {
+            const idx   = ETAPAS.findIndex(x => x.key === etapa)
+            const feito = i < idx
+            const ativo = e.key === etapa
+            return (
+              <div key={e.key} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  padding: '4px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700',
+                  background: ativo ? '#1a4731' : feito ? '#d1fae5' : '#f3f4f6',
+                  color:      ativo ? '#fff'    : feito ? '#166534' : '#9ca3af',
+                }}>
+                  {feito ? '✓' : e.icon} {e.label}
+                </div>
+                {i < ETAPAS.length - 1 && (
+                  <span style={{ color: '#d1d5db', fontSize: '16px', fontWeight: '300' }}>›</span>
+                )}
+              </div>
+            )
+          })}
         </div>
+      )}
 
-        {/* ── Corpo ── */}
-        <div style={st.corpo}>
+      {erro && <div style={st.erro}>{erro}</div>}
+
+      {/* ── Abas ── */}
+      <div style={st.abas}>
+        {abas.map(a => (
+          <button key={a.key} onClick={() => setAbaAtiva(a.key)} style={{
+            ...st.aba,
+            borderBottom: abaAtiva === a.key ? '3px solid #1a4731' : '3px solid transparent',
+            color:      abaAtiva === a.key ? '#1a4731' : '#6b7280',
+            fontWeight: abaAtiva === a.key ? '700' : '400',
+          }}>{a.label}</button>
+        ))}
+      </div>
+
+      {/* ── Corpo ── */}
+      <div style={st.corpo}>
 
           {/* ════════ ABA: GERAL ════════ */}
           {abaAtiva === 'geral' && (
@@ -1027,18 +1029,6 @@ export default function ModalTDR({ tdr, perfilUsuario, onFechar, onSalvar }) {
             </div>
           )}
 
-        </div>
-
-        {/* ── Rodapé ── */}
-        <div style={st.rodape}>
-          <button onClick={onFechar} style={st.btnSecundario}>Fechar</button>
-          {!isEdicao && (
-            <button onClick={salvar} disabled={salvando} style={st.btnSalvar}>
-              {salvando ? 'Criando...' : '+ Criar contratação'}
-            </button>
-          )}
-        </div>
-
       </div>
     </div>
   )
@@ -1056,19 +1046,19 @@ function Campo({ label, children }) {
 
 // ── estilos ────────────────────────────────────────────────────────────────────
 const st = {
-  overlay:      { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '24px', overflowY: 'auto' },
-  modal:        { background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '920px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', marginTop: '8px' },
-  cabecalho:    { display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '20px 28px 14px', borderBottom: '1px solid #e5e7eb' },
-  titulo:       { fontSize: '20px', fontWeight: '700', color: '#111827', margin: '0 0 4px' },
-  etapasBar:    { display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', flexWrap: 'wrap' },
+  pagina:       { display: 'flex', flexDirection: 'column', minHeight: '100%' },
+  cabecalho:    { display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 24px', background: '#fff', borderBottom: '1px solid #e5e7eb', flexWrap: 'wrap' },
+  btnVoltar:    { padding: '8px 16px', borderRadius: '8px', border: '1.5px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '14px', color: '#374151', fontWeight: '600', whiteSpace: 'nowrap' },
+  btnSalvarTopo:{ padding: '9px 20px', borderRadius: '8px', border: 'none', background: '#1a4731', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600', whiteSpace: 'nowrap' },
+  titulo:       { fontSize: '18px', fontWeight: '700', color: '#111827', margin: '0 0 3px' },
+  etapasBar:    { display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 24px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', flexWrap: 'wrap' },
   tagDemanda:   { fontSize: '11px', fontWeight: '600', color: '#1e40af', background: '#dbeafe', padding: '2px 10px', borderRadius: '20px' },
   tagTipo:      { fontSize: '11px', fontWeight: '600', color: '#92400e', background: '#fef3c7', padding: '2px 10px', borderRadius: '20px' },
   tagStatus:    { fontSize: '11px', fontWeight: '600', padding: '2px 10px', borderRadius: '20px' },
-  btnFechar:    { background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: '#9ca3af', padding: '4px', flexShrink: 0 },
-  erro:         { margin: '0 28px 8px', background: '#fef2f2', color: '#dc2626', padding: '10px 14px', borderRadius: '8px', fontSize: '13px' },
-  abas:         { display: 'flex', borderBottom: '1px solid #e5e7eb', padding: '0 16px', overflowX: 'auto', flexShrink: 0 },
-  aba:          { padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap', transition: 'all 0.15s' },
-  corpo:        { padding: '20px 28px', overflowY: 'auto', maxHeight: '56vh' },
+  erro:         { margin: '8px 24px 0', background: '#fef2f2', color: '#dc2626', padding: '10px 14px', borderRadius: '8px', fontSize: '13px' },
+  abas:         { display: 'flex', borderBottom: '1px solid #e5e7eb', padding: '0 20px', overflowX: 'auto', background: '#fff' },
+  aba:          { padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', whiteSpace: 'nowrap', transition: 'all 0.15s' },
+  corpo:        { padding: '24px', flex: 1 },
   form:         { display: 'flex', flexDirection: 'column', gap: '16px' },
   grid2:        { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' },
   grid3:        { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' },
@@ -1080,7 +1070,7 @@ const st = {
   btnUpload:    { padding: '12px 18px', borderRadius: '8px', border: '1.5px dashed #d1d5db', background: 'white', cursor: 'pointer', fontSize: '13px', color: '#6b7280' },
   btnUploadPeq: { padding: '7px 14px', borderRadius: '8px', border: '1.5px dashed #d1d5db', background: 'white', cursor: 'pointer', fontSize: '12px', color: '#6b7280' },
   btnLink:      { padding: '5px 12px', borderRadius: '6px', border: '1px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '12px', color: '#1a4731', fontWeight: '600', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' },
-  btnSalvar:    { padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#1a4731', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600', alignSelf: 'flex-start' },
+  btnSalvar:    { padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#1a4731', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600' },
   btnSecundario:{ padding: '9px 16px', borderRadius: '8px', border: '1.5px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '13px', color: '#6b7280' },
   btnRemover:   { background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: '#9ca3af', padding: '2px 4px' },
   btnAvancar:   { padding: '10px 18px', borderRadius: '8px', border: 'none', background: '#166534', color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: '700', whiteSpace: 'nowrap' },

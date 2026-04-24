@@ -27,15 +27,15 @@ function fmtMoeda(valor) {
 }
 
 export default function TDRs({ perfilUsuario }) {
-  const [tdrs, setTdrs]               = useState([])
-  const [carregando, setCarregando]   = useState(true)
-  const [modalAberto, setModalAberto] = useState(false)
+  const [tdrs, setTdrs]             = useState([])
+  const [carregando, setCarregando] = useState(true)
+  const [vista, setVista]           = useState('lista') // 'lista' | 'form'
   const [selecionado, setSelecionado] = useState(null)
 
   // Filtros
-  const [busca, setBusca]             = useState('')
+  const [busca, setBusca]               = useState('')
   const [filtroStatus, setFiltroStatus] = useState('todos')
-  const [filtroTipo, setFiltroTipo]   = useState('PF+PJ')
+  const [filtroTipo, setFiltroTipo]     = useState('PF+PJ')
 
   const carregar = async () => {
     setCarregando(true)
@@ -54,10 +54,10 @@ export default function TDRs({ perfilUsuario }) {
     carregar()
   }
 
-  const abrirNovo   = () => { setSelecionado(null); setModalAberto(true) }
-  const abrirEditar = (t) => { setSelecionado(t); setModalAberto(true) }
-  const fechar      = () => { setModalAberto(false); setSelecionado(null) }
-  const aoSalvar    = () => { fechar(); carregar() }
+  const abrirNovo   = () => { setSelecionado(null); setVista('form') }
+  const abrirEditar = (t) => { setSelecionado(t);  setVista('form') }
+  const voltar      = () => { setVista('lista'); setSelecionado(null) }
+  const aoSalvar    = () => { voltar(); carregar() }
 
   // Filtrar lista
   const tdrsFiltrados = tdrs.filter(t => {
@@ -79,6 +79,18 @@ export default function TDRs({ perfilUsuario }) {
   const comContrato = tdrs.filter(t => t.etapa === 'contrato' || t.etapa === 'produtos').length
   const atrasados   = tdrs.filter(t => t.prazo_limite && new Date(t.prazo_limite) < hoje && t.status !== 'cancelado' && t.etapa === 'tdr').length
   const valorTotal  = tdrs.filter(t => t.status !== 'cancelado').reduce((s, t) => s + Number(t.valor_brl || 0), 0)
+
+  // Vista: formulário de edição/criação (página inteira)
+  if (vista === 'form') {
+    return (
+      <ModalTDR
+        tdr={selecionado}
+        perfilUsuario={perfilUsuario}
+        onVoltar={voltar}
+        onSalvar={aoSalvar}
+      />
+    )
+  }
 
   return (
     <div>
@@ -216,14 +228,6 @@ export default function TDRs({ perfilUsuario }) {
         </div>
       )}
 
-      {modalAberto && (
-        <ModalTDR
-          tdr={selecionado}
-          perfilUsuario={perfilUsuario}
-          onFechar={fechar}
-          onSalvar={aoSalvar}
-        />
-      )}
     </div>
   )
 }
