@@ -268,15 +268,15 @@ export default function PassagensDiarias({ perfilUsuario }) {
                   const d = s.dados || {}
                   const cor = STATUS_COR[s.status] || STATUS_COR.rascunho
                   const bg  = s.urgente ? '#fff5f5' : sIdx % 2 === 0 ? '#fff' : '#f9fafb'
+                  const beneficiarios = d.beneficiarios?.length
+                    ? d.beneficiarios
+                    : [{ nome_completo: d.nome_completo }]
                   // Soma as diárias de cada beneficiário individualmente
                   const totalValor = beneficiarios.reduce((acc, b) =>
                     acc + calcularTotais(b.diarias || d.diarias || {}), 0)
                     + Number(d.passagem_valor || 0)
                     + Number(d.transporte_valor || 0)
                     + Number(d.hospedagem_valor || 0)
-                  const beneficiarios = d.beneficiarios?.length
-                    ? d.beneficiarios
-                    : [{ nome_completo: d.nome_completo }]
                   const aberto = grupoAberto === s.id
                   const todosComDoc = beneficiarios.every((_, i) =>
                     !!(s.anexos_assinados || {})[String(i)]
