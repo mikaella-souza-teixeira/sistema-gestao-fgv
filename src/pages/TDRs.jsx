@@ -158,7 +158,8 @@ export default function TDRs({ perfilUsuario }) {
 
                 {/* Linha 3: metadados */}
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                  {t.linha && <span style={styles.metaInfo}>📋 {t.linha}</span>}
+                  {t.componente && <span style={styles.metaInfo}>🧩 {t.componente}</span>}
+                  {t.linhas_poa && <span style={styles.metaInfo}>📋 {t.linhas_poa}</span>}
                   {t.prazo_limite && (
                     <span style={{ ...styles.metaInfo, color: atrasado ? '#dc2626' : '#6b7280' }}>
                       📅 Prazo: {new Date(t.prazo_limite).toLocaleDateString('pt-BR')}

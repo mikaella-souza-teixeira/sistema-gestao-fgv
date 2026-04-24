@@ -62,6 +62,7 @@ export default function ModalTDR({ tdr, perfilUsuario, onFechar, onSalvar }) {
   const [produtos, setProdutos] = useState([])
   const [etapa,    setEtapa]    = useState(tdr?.etapa || 'tdr')
   const [enviandoAquisicao, setEnviandoAquisicao] = useState(false)
+  const [buscandoDemanda, setBuscandoDemanda] = useState(false)
 
   // refs de upload
   const docRef      = useRef()
@@ -71,9 +72,8 @@ export default function ModalTDR({ tdr, perfilUsuario, onFechar, onSalvar }) {
 
   // ── form principal ─────────────────────────────────────────────────────────
   const [form, setForm] = useState({
-    numero: '', numero_demanda: '', linha: '', tipo: 'PF',
-    objeto: '', descricao: '', formacao: '', experiencia: '',
-    prazo_limite: '', observacoes: '',
+    numero: '', numero_demanda: '', linhas_poa: '', componente: '', tipo: 'PF',
+    objeto: '', descricao: '', prazo_limite: '', observacoes: '',
     valor_brl: '', valor_usd: '',
   })
 
@@ -113,12 +113,11 @@ export default function ModalTDR({ tdr, perfilUsuario, onFechar, onSalvar }) {
       setForm({
         numero:         tdr.numero         || '',
         numero_demanda: tdr.numero_demanda || '',
-        linha:          tdr.linha          || '',
+        linhas_poa:     tdr.linhas_poa     || '',
+        componente:     tdr.componente     || '',
         tipo:           tdr.tipo           || 'PF',
         objeto:         tdr.objeto         || '',
         descricao:      tdr.descricao      || '',
-        formacao:       tdr.formacao       || '',
-        experiencia:    tdr.experiencia    || '',
         prazo_limite:   tdr.prazo_limite   || '',
         observacoes:    tdr.observacoes    || '',
         valor_brl:      tdr.valor_brl      || '',
@@ -183,6 +182,27 @@ export default function ModalTDR({ tdr, perfilUsuario, onFechar, onSalvar }) {
     setProdutos(data || [])
   }
 
+  // ── buscar demanda na tabela atividades ──────────────────────────────────
+  const buscarDemanda = async (id) => {
+    if (!id || id.length < 10) return
+    setBuscandoDemanda(true)
+    try {
+      const { data } = await supabase
+        .from('atividades')
+        .select('linhas_poa, componente')
+        .eq('id', id.trim())
+        .single()
+      if (data) {
+        setForm(f => ({
+          ...f,
+          linhas_poa: data.linhas_poa || f.linhas_poa,
+          componente: data.componente || f.componente,
+        }))
+      }
+    } catch {}
+    setBuscandoDemanda(false)
+  }
+
   // ── helpers ───────────────────────────────────────────────────────────────
   const set    = (c, v) => setForm(f => ({ ...f, [c]: v }))
   const setDoc = (c, v) => setNovoDoc(f => ({ ...f, [c]: v }))
@@ -215,9 +235,11 @@ export default function ModalTDR({ tdr, perfilUsuario, onFechar, onSalvar }) {
       const userId  = (await supabase.auth.getUser()).data.user?.id
       const payload = { ...form, usuario_id: userId, updated_at: new Date().toISOString() }
       if (isEdicao) {
-        await supabase.from('tdrs').update(payload).eq('id', tdr.id)
+        const { error } = await supabase.from('tdrs').update(payload).eq('id', tdr.id)
+        if (error) throw error
       } else {
-        await supabase.from('tdrs').insert({ ...payload, etapa: 'tdr', status: 'rascunho' })
+        const { error } = await supabase.from('tdrs').insert({ ...payload, etapa: 'tdr', status: 'rascunho' })
+        if (error) throw error
       }
       onSalvar()
     } catch (e) { setErro('Erro ao salvar: ' + e.message) }
@@ -487,15 +509,30 @@ export default function ModalTDR({ tdr, perfilUsuario, onFechar, onSalvar }) {
                   <input style={st.input} value={form.numero}
                     onChange={e => set('numero', e.target.value)} placeholder="TDR-001" />
                 </Campo>
-                <Campo label="Número da Demanda">
+                <Campo label={buscandoDemanda ? 'Número da Demanda  🔄 Buscando...' : 'Número da Demanda'}>
                   <input style={st.input} value={form.numero_demanda}
-                    onChange={e => set('numero_demanda', e.target.value)} placeholder="DE-ASL2-..." />
+                    onChange={e => set('numero_demanda', e.target.value)}
+                    onBlur={e => buscarDemanda(e.target.value)}
+                    placeholder="DE-ASL2-POA3-XXX-2026-00XX" />
                 </Campo>
                 <Campo label="Tipo">
                   <select style={st.input} value={form.tipo} onChange={e => set('tipo', e.target.value)}>
                     <option value="PF">Pessoa Física (PF)</option>
                     <option value="PJ">Pessoa Jurídica (PJ)</option>
                   </select>
+                </Campo>
+              </div>
+
+              <div style={st.grid2}>
+                <Campo label="Linha(s) do POA">
+                  <input style={st.input} value={form.linhas_poa}
+                    onChange={e => set('linhas_poa', e.target.value)}
+                    placeholder="Preenchido automaticamente pelo número da demanda" />
+                </Campo>
+                <Campo label="Componente">
+                  <input style={st.input} value={form.componente}
+                    onChange={e => set('componente', e.target.value)}
+                    placeholder="Preenchido automaticamente" />
                 </Campo>
               </div>
 
@@ -510,24 +547,9 @@ export default function ModalTDR({ tdr, perfilUsuario, onFechar, onSalvar }) {
               </Campo>
 
               <div style={st.grid2}>
-                <Campo label="Formação / Qualificação exigida">
-                  <textarea style={{ ...st.input, minHeight: '70px' }} value={form.formacao}
-                    onChange={e => set('formacao', e.target.value)} />
-                </Campo>
-                <Campo label="Experiência requerida">
-                  <textarea style={{ ...st.input, minHeight: '70px' }} value={form.experiencia}
-                    onChange={e => set('experiencia', e.target.value)} />
-                </Campo>
-              </div>
-
-              <div style={st.grid3}>
                 <Campo label="Prazo limite">
                   <input style={st.input} type="date" value={form.prazo_limite}
                     onChange={e => set('prazo_limite', e.target.value)} />
-                </Campo>
-                <Campo label="Linha de atuação">
-                  <input style={st.input} value={form.linha}
-                    onChange={e => set('linha', e.target.value)} placeholder="Ex: Linha 2 — Gestão..." />
                 </Campo>
                 <div />
               </div>
