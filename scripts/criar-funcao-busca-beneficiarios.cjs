@@ -79,7 +79,7 @@ const options = {
   path: '/v1/projects/zbxlyaynypypeywsxgnd/database/query',
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer sbp_30e9467702d08db678da28291e0ce8a9006fabf6',
+    'Authorization': 'Bearer sbp_cc1f290fd64b3e4f342407d9f6b8c624ae1b6c95',
     'Content-Type': 'application/json',
     'Content-Length': Buffer.byteLength(body),
   },

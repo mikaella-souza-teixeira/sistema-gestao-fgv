@@ -1,8 +1,22 @@
 const https = require('https')
 
 const sql = `
-ALTER TABLE public.passagens_diarias
-  ADD COLUMN IF NOT EXISTS anexos_assinados jsonb DEFAULT '{}';
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('anexos', 'anexos', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS upload_autenticados ON storage.objects;
+DROP POLICY IF EXISTS update_autenticados ON storage.objects;
+DROP POLICY IF EXISTS select_public ON storage.objects;
+
+CREATE POLICY upload_autenticados ON storage.objects
+  FOR INSERT TO authenticated WITH CHECK (bucket_id = 'anexos');
+
+CREATE POLICY update_autenticados ON storage.objects
+  FOR UPDATE TO authenticated USING (bucket_id = 'anexos');
+
+CREATE POLICY select_public ON storage.objects
+  FOR SELECT TO public USING (bucket_id = 'anexos');
 `
 
 const body = JSON.stringify({ query: sql })
@@ -23,7 +37,7 @@ const req = https.request(options, res => {
   res.on('data', d => data += d)
   res.on('end', () => {
     if (data === '[]' || data === '') {
-      console.log('✅ Coluna anexos_assinados criada!')
+      console.log('✅ Políticas de storage criadas!')
     } else {
       console.log('Resposta:', data)
     }
