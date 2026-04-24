@@ -6,25 +6,44 @@ import { gerarDocumentoWord, calcularTotais, formatarMoeda } from '../lib/gerarD
 function AutocompleteNome({ value, onChange, onSelect, inputStyle }) {
   const [sugestoes, setSugestoes] = useState([])
   const [aberto, setAberto] = useState(false)
+  const [semResultado, setSemResultado] = useState(false)
   const timerRef = useRef(null)
 
   const handleChange = (e) => {
     const val = e.target.value
     onChange(val)
+    setSemResultado(false)
     clearTimeout(timerRef.current)
-    if (val.length >= 2) {
+    if (val.length >= 1) {
       timerRef.current = setTimeout(async () => {
-        const { data } = await supabase
-          .from('beneficiarios_cadastrados')
-          .select('*')
-          .ilike('nome_completo', `%${val}%`)
-          .limit(6)
-        setSugestoes(data || [])
-        setAberto((data || []).length > 0)
-      }, 300)
+        // 1ª tentativa: função RPC que busca em cadastros + histórico de solicitações
+        let resultados = []
+        try {
+          const { data: rpcData, error } = await supabase
+            .rpc('buscar_beneficiarios', { termo: val })
+          if (!error && rpcData?.length > 0) {
+            resultados = rpcData
+          }
+        } catch (_) {}
+
+        // Fallback: busca direta na tabela de cadastros
+        if (resultados.length === 0) {
+          const { data } = await supabase
+            .from('beneficiarios_cadastrados')
+            .select('*')
+            .ilike('nome_completo', `%${val}%`)
+            .limit(8)
+          resultados = data || []
+        }
+
+        setSugestoes(resultados)
+        setAberto(resultados.length > 0)
+        setSemResultado(resultados.length === 0 && val.length >= 2)
+      }, 250)
     } else {
       setSugestoes([])
       setAberto(false)
+      setSemResultado(false)
     }
   }
 
@@ -36,19 +55,28 @@ function AutocompleteNome({ value, onChange, onSelect, inputStyle }) {
         onChange={handleChange}
         onFocus={() => sugestoes.length > 0 && setAberto(true)}
         onBlur={() => setTimeout(() => setAberto(false), 180)}
-        placeholder="Digite para buscar cadastros anteriores..."
+        placeholder="Digite o nome para buscar cadastros anteriores..."
         autoComplete="off"
       />
       {aberto && (
         <div style={estilosAC.caixa}>
-          {sugestoes.map(b => (
-            <div key={b.id} onMouseDown={() => { onSelect(b); setAberto(false) }}
+          {sugestoes.map((b, idx) => (
+            <div key={b.id || idx} onMouseDown={() => { onSelect(b); setAberto(false) }}
               style={estilosAC.item}>
               <span style={estilosAC.nome}>{b.nome_completo}</span>
-              <span style={estilosAC.info}>{b.cpf ? `CPF: ${b.cpf}` : 'Sem CPF'}{b.banco ? ` · ${b.banco}` : ''}</span>
+              <span style={estilosAC.info}>
+                {b.cpf ? `CPF: ${b.cpf}` : 'Sem CPF'}
+                {b.banco ? ` · ${b.banco}` : ''}
+                {b.cidade_estado ? ` · ${b.cidade_estado}` : ''}
+              </span>
             </div>
           ))}
         </div>
+      )}
+      {semResultado && (
+        <p style={{ fontSize: '12px', color: '#9ca3af', margin: '4px 0 0 2px' }}>
+          Nenhum cadastro encontrado — os dados serão salvos ao enviar.
+        </p>
       )}
     </div>
   )
