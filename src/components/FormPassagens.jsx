@@ -130,6 +130,8 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
   const [salvando, setSalvando] = useState(false)
   const [gerando, setGerando] = useState(false)
   const [erro, setErro] = useState('')
+  const [painelGerar, setPainelGerar] = useState(false)
+  const [benefSelecionados, setBenefSelecionados] = useState([])
   const [buscandoCep, setBuscandoCep] = useState(false)
   const [buscandoDemanda, setBuscandoDemanda] = useState(false)
 
@@ -362,8 +364,9 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
     setSalvando(false)
   }
 
-  const gerarDoc = async () => {
-    setGerando(true); setErro('')
+  // indices = array de índices dos beneficiários a gerar; null = todos
+  const gerarDoc = async (indices = null) => {
+    setGerando(true); setErro(''); setPainelGerar(false)
     try {
       const userId = (await supabase.auth.getUser()).data.user?.id
       const payload = { usuario_id: userId, dados: form, status: 'enviado', updated_at: new Date().toISOString() }
@@ -371,7 +374,6 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
         await supabase.from('passagens_diarias').update(payload).eq('id', solicitacao.id)
       } else {
         const { data: inserted } = await supabase.from('passagens_diarias').insert(payload).select('id').single()
-        // Notificar admin
         if (inserted) {
           await supabase.from('notificacoes').insert({
             tipo: 'nova_solicitacao',
@@ -381,13 +383,25 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
         }
       }
       await upsertBeneficiarios()
-      // Gerar um Word por viajante
-      for (const beneficiario of form.beneficiarios) {
+      // Gerar Word apenas para os selecionados (ou todos se indices = null)
+      const lista = indices !== null
+        ? form.beneficiarios.filter((_, i) => indices.includes(i))
+        : form.beneficiarios
+      for (const beneficiario of lista) {
         await gerarDocumentoWord({ ...form, ...beneficiario })
       }
       onSalvar()
     } catch (e) { setErro(`Erro ao gerar documento: ${e.message}`) }
     setGerando(false)
+  }
+
+  const salvarEProximo = async () => {
+    await salvar('rascunho')
+    if (viajanteSel < form.beneficiarios.length - 1) {
+      setViajanteSel(viajanteSel + 1)
+    } else {
+      adicionarViajante()
+    }
   }
 
   const abas = [
@@ -412,9 +426,54 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
           <button onClick={() => salvar('rascunho')} disabled={salvando} style={styles.btnRascunho}>
             {salvando ? 'Salvando...' : '💾 Salvar Rascunho'}
           </button>
-          <button onClick={gerarDoc} disabled={gerando} style={styles.btnGerar}>
-            {gerando ? 'Gerando...' : '📄 Gerar Documento(s) Word'}
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => {
+                if (form.beneficiarios.length === 1) {
+                  gerarDoc(null)
+                } else {
+                  setBenefSelecionados(form.beneficiarios.map((_, i) => i))
+                  setPainelGerar(p => !p)
+                }
+              }}
+              disabled={gerando}
+              style={styles.btnGerar}>
+              {gerando ? 'Gerando...' : '📄 Gerar Word'}
+            </button>
+            {/* Painel de seleção de beneficiários */}
+            {painelGerar && (
+              <div style={styles.painelGerarBox}>
+                <p style={{ fontSize: '13px', fontWeight: '700', color: '#111827', margin: '0 0 10px 0' }}>
+                  Gerar Word para quais viajantes?
+                </p>
+                {form.beneficiarios.map((b, i) => (
+                  <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', cursor: 'pointer', fontSize: '13px', color: '#374151' }}>
+                    <input
+                      type="checkbox"
+                      checked={benefSelecionados.includes(i)}
+                      onChange={e => setBenefSelecionados(prev =>
+                        e.target.checked ? [...prev, i] : prev.filter(x => x !== i)
+                      )}
+                      style={{ width: '16px', height: '16px', accentColor: '#1a4731' }}
+                    />
+                    {b.nome_completo || `Viajante ${i + 1}`}
+                  </label>
+                ))}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                  <button
+                    onClick={() => gerarDoc(benefSelecionados)}
+                    disabled={benefSelecionados.length === 0 || gerando}
+                    style={{ ...styles.btnGerar, flex: 1, fontSize: '13px', padding: '8px 12px' }}>
+                    {gerando ? 'Gerando...' : `📄 Gerar (${benefSelecionados.length})`}
+                  </button>
+                  <button onClick={() => setPainelGerar(false)}
+                    style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '13px' }}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -575,6 +634,15 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
                     placeholder="D" maxLength={2} />
                 </div>
               </Campo>
+            </div>
+
+            {/* Botão salvar e ir para próximo */}
+            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={salvarEProximo} disabled={salvando} style={styles.btnSalvarProximo}>
+                {salvando ? 'Salvando...' : viajanteSel < form.beneficiarios.length - 1
+                  ? `💾 Salvar e ir para ${form.beneficiarios[viajanteSel + 1]?.nome_completo || `Viajante ${viajanteSel + 2}`} →`
+                  : '💾 Salvar e adicionar próximo viajante +'}
+              </button>
             </div>
           </div>
         )}
@@ -832,7 +900,19 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
         <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
           {aba < abas.length - 1 && <button onClick={() => setAba(a => a + 1)} style={styles.btnNavPrimario}>Próximo →</button>}
           {aba === abas.length - 1 && (
-            <button onClick={gerarDoc} disabled={gerando} style={styles.btnGerar}>
+            <button
+              onClick={() => {
+                if (form.beneficiarios.length === 1) {
+                  gerarDoc(null)
+                } else {
+                  setBenefSelecionados(form.beneficiarios.map((_, i) => i))
+                  setPainelGerar(p => !p)
+                  // Scroll para o painel no topo
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }
+              }}
+              disabled={gerando}
+              style={styles.btnGerar}>
               {gerando ? 'Gerando...' : '📄 Gerar Documento(s) Word'}
             </button>
           )}
@@ -858,6 +938,8 @@ const styles = {
   acoesHeader: { display: 'flex', gap: '10px' },
   btnRascunho: { padding: '9px 16px', borderRadius: '8px', border: '1.5px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '500' },
   btnGerar: { padding: '9px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #1a4731, #2d7a4f)', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600' },
+  btnSalvarProximo: { padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#1e40af', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600' },
+  painelGerarBox: { position: 'absolute', top: '110%', right: 0, zIndex: 300, background: 'white', border: '1.5px solid #1a4731', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '16px 20px', minWidth: '280px' },
   erro: { background: '#fef2f2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' },
   abas: { display: 'flex', borderBottom: '2px solid #e5e7eb', marginBottom: '20px', overflowX: 'auto' },
   aba: { padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', whiteSpace: 'nowrap', transition: 'all 0.2s' },
