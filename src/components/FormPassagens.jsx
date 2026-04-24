@@ -390,10 +390,6 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
     setGerando(false)
   }
 
-  const totalDiariasViajante = calcularTotais(v.diarias || {})
-  const totalDiariasGrupo   = form.beneficiarios.reduce((acc, b) => acc + calcularTotais(b.diarias || {}), 0)
-  const totalGeral = totalDiariasGrupo + Number(form.passagem_valor || 0) + Number(form.transporte_valor || 0) + Number(form.hospedagem_valor || 0)
-
   const abas = [
     'Viajantes', 'Projeto',
     ...(form.tem_passagem === 'sim' ? ['Passagem Aérea'] : []),
@@ -402,6 +398,10 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
     'Diárias',
   ]
   const v = form.beneficiarios[viajanteSel] || VIAJANTE_VAZIO
+
+  const totalDiariasViajante = calcularTotais(v.diarias || {})
+  const totalDiariasGrupo   = form.beneficiarios.reduce((acc, b) => acc + calcularTotais(b.diarias || {}), 0)
+  const totalGeral = totalDiariasGrupo + Number(form.passagem_valor || 0) + Number(form.transporte_valor || 0) + Number(form.hospedagem_valor || 0)
 
   return (
     <div>
