@@ -2,6 +2,26 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { downloadArquivo } from '../lib/downloads'
 
+// ── helpers de moeda ───────────────────────────────────────────────────────────
+function mascararMoeda(valor) {
+  const digits = String(valor).replace(/\D/g, '')
+  if (!digits) return ''
+  const num = parseInt(digits, 10)
+  return (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function parseMoeda(str) {
+  if (!str) return null
+  const limpo = String(str).replace(/\./g, '').replace(',', '.')
+  const n = parseFloat(limpo)
+  return isNaN(n) ? null : n
+}
+function iniciarMoeda(valor) {
+  if (!valor && valor !== 0) return ''
+  const n = parseFloat(valor)
+  if (isNaN(n)) return ''
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 // ── constantes ─────────────────────────────────────────────────────────────────
 const TIPOS_DOC = {
   tdr_principal:   { label: 'TDR Principal',       icon: '📄', cor: '#1e40af', bg: '#dbeafe' },
@@ -120,8 +140,8 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
         descricao:      tdr.descricao      || '',
         prazo_limite:   tdr.prazo_limite   || '',
         observacoes:    tdr.observacoes    || '',
-        valor_brl:      tdr.valor_brl      || '',
-        valor_usd:      tdr.valor_usd      || '',
+        valor_brl:      iniciarMoeda(tdr.valor_brl),
+        valor_usd:      iniciarMoeda(tdr.valor_usd),
       })
       setEtapa(tdr.etapa || 'tdr')
       carregarDocs()
@@ -161,8 +181,8 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
       setFormCont({
         numero_contrato: data.numero_contrato || '',
         contratado:      data.contratado      || '',
-        valor_brl:       data.valor_brl       || '',
-        valor_usd:       data.valor_usd       || '',
+        valor_brl:       iniciarMoeda(data.valor_brl),
+        valor_usd:       iniciarMoeda(data.valor_usd),
         data_assinatura: data.data_assinatura || '',
         vigencia_inicio: data.vigencia_inicio || '',
         vigencia_fim:    data.vigencia_fim    || '',
@@ -233,7 +253,13 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
     setSalvando(true); setErro('')
     try {
       const userId  = (await supabase.auth.getUser()).data.user?.id
-      const payload = { ...form, usuario_id: userId, updated_at: new Date().toISOString() }
+      const payload = {
+        ...form,
+        valor_brl:  parseMoeda(form.valor_brl),
+        valor_usd:  parseMoeda(form.valor_usd),
+        usuario_id: userId,
+        updated_at: new Date().toISOString(),
+      }
       if (isEdicao) {
         const { error } = await supabase.from('tdrs').update(payload).eq('id', tdr.id)
         if (error) throw error
@@ -350,7 +376,14 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
       if (contratoRef.current?.files?.[0]) {
         arquivo_url = await uploadArquivo(contratoRef.current.files[0], 'contratos', 'contrato') || arquivo_url
       }
-      const payload = { ...formCont, arquivo_url, tdr_id: tdr.id, updated_at: new Date().toISOString() }
+      const payload = {
+        ...formCont,
+        valor_brl:  parseMoeda(formCont.valor_brl),
+        valor_usd:  parseMoeda(formCont.valor_usd),
+        arquivo_url,
+        tdr_id:     tdr.id,
+        updated_at: new Date().toISOString(),
+      }
       if (contrato?.id) {
         await supabase.from('tdrs_contratos').update(payload).eq('id', contrato.id)
       } else {
@@ -564,16 +597,18 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
                     <div style={st.inputPreco}>
                       <span style={st.moeda}>R$</span>
                       <input style={{ ...st.input, borderLeft: 'none', borderRadius: '0 8px 8px 0' }}
-                        type="number" step="0.01" value={form.valor_brl}
-                        onChange={e => set('valor_brl', e.target.value)} placeholder="0,00" />
+                        inputMode="numeric" value={form.valor_brl}
+                        onChange={e => set('valor_brl', mascararMoeda(e.target.value))}
+                        placeholder="0,00" />
                     </div>
                   </Campo>
                   <Campo label="Valor em U$ (Dólares)">
                     <div style={st.inputPreco}>
                       <span style={st.moeda}>U$</span>
                       <input style={{ ...st.input, borderLeft: 'none', borderRadius: '0 8px 8px 0' }}
-                        type="number" step="0.01" value={form.valor_usd}
-                        onChange={e => set('valor_usd', e.target.value)} placeholder="0,00" />
+                        inputMode="numeric" value={form.valor_usd}
+                        onChange={e => set('valor_usd', mascararMoeda(e.target.value))}
+                        placeholder="0,00" />
                     </div>
                   </Campo>
                 </div>
@@ -847,16 +882,18 @@ export default function ModalTDR({ tdr, perfilUsuario, onVoltar, onSalvar }) {
                       <div style={st.inputPreco}>
                         <span style={st.moeda}>R$</span>
                         <input style={{ ...st.input, borderLeft: 'none', borderRadius: '0 8px 8px 0' }}
-                          type="number" step="0.01" value={formCont.valor_brl}
-                          onChange={e => setCont('valor_brl', e.target.value)} placeholder="0,00" />
+                          inputMode="numeric" value={formCont.valor_brl}
+                          onChange={e => setCont('valor_brl', mascararMoeda(e.target.value))}
+                          placeholder="0,00" />
                       </div>
                     </Campo>
                     <Campo label="Valor contratado (U$)">
                       <div style={st.inputPreco}>
                         <span style={st.moeda}>U$</span>
                         <input style={{ ...st.input, borderLeft: 'none', borderRadius: '0 8px 8px 0' }}
-                          type="number" step="0.01" value={formCont.valor_usd}
-                          onChange={e => setCont('valor_usd', e.target.value)} placeholder="0,00" />
+                          inputMode="numeric" value={formCont.valor_usd}
+                          onChange={e => setCont('valor_usd', mascararMoeda(e.target.value))}
+                          placeholder="0,00" />
                       </div>
                     </Campo>
                   </div>
