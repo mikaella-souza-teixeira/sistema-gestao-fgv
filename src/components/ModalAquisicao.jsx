@@ -8,7 +8,15 @@ const TIPO_LABEL = {
 
 const ITEM_VAZIO = {
   nome: '', valor: '', fornecedor: '',
-  nota_fiscal_url: '', fotos_urls: [],
+  nota_fiscal_urls: [], fotos_urls: [],
+}
+
+// Compatibilidade com registros antigos (nota_fiscal_url → array)
+function normalizarItem(it) {
+  const urls = it.nota_fiscal_urls?.length
+    ? it.nota_fiscal_urls
+    : it.nota_fiscal_url ? [it.nota_fiscal_url] : []
+  return { ...ITEM_VAZIO, ...it, nota_fiscal_urls: urls }
 }
 
 function fmtMoeda(v) {
@@ -41,7 +49,7 @@ export default function ModalAquisicao({ aquisicao, perfilUsuario, unidades, onF
         tipo:           aquisicao.tipo           || 'pequenas_compras',
         unidade_id:     aquisicao.unidade_id     || '',
         observacoes:    aquisicao.observacoes    || '',
-        itens:          aquisicao.itens?.length ? aquisicao.itens : [{ ...ITEM_VAZIO }],
+        itens: aquisicao.itens?.length ? aquisicao.itens.map(normalizarItem) : [{ ...ITEM_VAZIO }],
       })
     }
   }, [aquisicao])
@@ -71,32 +79,30 @@ export default function ModalAquisicao({ aquisicao, perfilUsuario, unidades, onF
     setUploadando(chave)
     try {
       const ext  = arquivo.name.split('.').pop()
-      const path = `aquisicoes/${Date.now()}-${tipo}.${ext}`
+      const nome = arquivo.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_')
+      const path = `aquisicoes/${Date.now()}-${nome}.${ext}`
       const { error } = await supabase.storage.from('anexos').upload(path, arquivo, { upsert: true })
       if (error) throw error
       const { data: urlData } = supabase.storage.from('anexos').getPublicUrl(path)
-      if (tipo === 'nota') {
-        setItem(idx, 'nota_fiscal_url', urlData.publicUrl)
-      } else {
-        setForm(f => ({
-          ...f,
-          itens: f.itens.map((it, i) =>
-            i === idx ? { ...it, fotos_urls: [...(it.fotos_urls || []), urlData.publicUrl] } : it
-          ),
-        }))
-      }
+      const campo = tipo === 'nota' ? 'nota_fiscal_urls' : 'fotos_urls'
+      setForm(f => ({
+        ...f,
+        itens: f.itens.map((it, i) =>
+          i === idx ? { ...it, [campo]: [...(it[campo] || []), urlData.publicUrl] } : it
+        ),
+      }))
     } catch (e) {
       alert(`Erro ao enviar arquivo: ${e.message}`)
     }
     setUploadando(null)
   }
 
-  const removerFoto = (idxItem, idxFoto) => {
+  const removerAnexo = (idxItem, campo, idxAnexo) => {
     setForm(f => ({
       ...f,
       itens: f.itens.map((it, i) =>
         i === idxItem
-          ? { ...it, fotos_urls: it.fotos_urls.filter((_, j) => j !== idxFoto) }
+          ? { ...it, [campo]: it[campo].filter((_, j) => j !== idxAnexo) }
           : it
       ),
     }))
@@ -226,39 +232,54 @@ export default function ModalAquisicao({ aquisicao, perfilUsuario, unidades, onF
                 </Campo>
               </div>
 
-              {/* Nota Fiscal */}
+              {/* Notas Fiscais (múltiplos) */}
               <div style={styles.uploadSecao}>
-                <h4 style={styles.uploadTitulo}>📄 Nota Fiscal</h4>
-                {item.nota_fiscal_url ? (
-                  <div style={styles.arquivoAnexado}>
-                    <a href={item.nota_fiscal_url} target="_blank" rel="noreferrer" style={styles.linkAnexo}>
-                      ✅ Nota fiscal anexada — clique para ver
-                    </a>
-                    <button onClick={() => setItem(itemSel, 'nota_fiscal_url', '')}
-                      style={styles.btnRemoverAnexo}>✕ Remover</button>
-                  </div>
-                ) : (
-                  <>
-                    <input ref={el => notaRefs.current[itemSel] = el} type="file"
-                      accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }}
-                      onChange={e => e.target.files[0] && uploadArquivo(itemSel, 'nota', e.target.files[0])} />
-                    <button onClick={() => notaRefs.current[itemSel]?.click()}
-                      disabled={uploadando === `${itemSel}-nota`}
-                      style={styles.btnUpload}>
-                      {uploadando === `${itemSel}-nota` ? '⏳ Enviando...' : '📎 Anexar Nota Fiscal (PDF ou imagem)'}
-                    </button>
-                  </>
-                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={styles.uploadTitulo}>📄 Notas Fiscais / Documentos</h4>
+                  <span style={{ fontSize: '12px', color: '#9ca3af' }}>
+                    {(item.nota_fiscal_urls || []).length} arquivo{(item.nota_fiscal_urls || []).length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div style={styles.anexosLista}>
+                  {(item.nota_fiscal_urls || []).map((url, fi) => {
+                    const nomeArq = decodeURIComponent(url.split('/').pop().split('?')[0]).replace(/^\d+-/, '')
+                    const isImg = /\.(jpg|jpeg|png|webp)$/i.test(nomeArq)
+                    return (
+                      <div key={fi} style={styles.anexoItem}>
+                        <span style={styles.anexoIcone}>{isImg ? '🖼️' : '📄'}</span>
+                        <a href={url} target="_blank" rel="noreferrer" style={styles.anexoNome}>
+                          {nomeArq || `Documento ${fi + 1}`}
+                        </a>
+                        <button onClick={() => removerAnexo(itemSel, 'nota_fiscal_urls', fi)}
+                          style={styles.btnRemoverAnexo}>✕</button>
+                      </div>
+                    )
+                  })}
+                  <input ref={el => notaRefs.current[itemSel] = el} type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+                    style={{ display: 'none' }}
+                    onChange={e => e.target.files[0] && uploadArquivo(itemSel, 'nota', e.target.files[0])} />
+                  <button onClick={() => notaRefs.current[itemSel]?.click()}
+                    disabled={uploadando === `${itemSel}-nota`}
+                    style={styles.btnUpload}>
+                    {uploadando === `${itemSel}-nota` ? '⏳ Enviando...' : '📎 + Adicionar documento (PDF, imagem, Word, Excel)'}
+                  </button>
+                </div>
               </div>
 
               {/* Fotos dos produtos */}
               <div style={styles.uploadSecao}>
-                <h4 style={styles.uploadTitulo}>📷 Fotos do Produto</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={styles.uploadTitulo}>📷 Fotos do Produto</h4>
+                  <span style={{ fontSize: '12px', color: '#9ca3af' }}>
+                    {(item.fotos_urls || []).length} foto{(item.fotos_urls || []).length !== 1 ? 's' : ''}
+                  </span>
+                </div>
                 <div style={styles.fotosGrid}>
                   {(item.fotos_urls || []).map((url, fi) => (
                     <div key={fi} style={styles.fotoCard}>
                       <img src={url} alt={`Foto ${fi + 1}`} style={styles.fotoImg} />
-                      <button onClick={() => removerFoto(itemSel, fi)} style={styles.btnRemoverFoto}>✕</button>
+                      <button onClick={() => removerAnexo(itemSel, 'fotos_urls', fi)} style={styles.btnRemoverFoto}>✕</button>
                     </div>
                   ))}
                   <div>
@@ -342,10 +363,12 @@ const styles = {
   itemForm: { background: '#f9fafb', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '16px', border: '1px solid #e5e7eb' },
   uploadSecao: { display: 'flex', flexDirection: 'column', gap: '8px' },
   uploadTitulo: { fontSize: '13px', fontWeight: '600', color: '#374151', margin: 0 },
-  arquivoAnexado: { display: 'flex', alignItems: 'center', gap: '12px' },
-  linkAnexo: { color: '#1a4731', fontSize: '13px', fontWeight: '600', textDecoration: 'none' },
-  btnRemoverAnexo: { background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
-  btnUpload: { padding: '9px 16px', borderRadius: '8px', border: '1.5px dashed #d1d5db', background: 'white', cursor: 'pointer', fontSize: '13px', color: '#6b7280', textAlign: 'left' },
+  anexosLista: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  anexoItem: { display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'white', borderRadius: '8px', border: '1px solid #e5e7eb' },
+  anexoIcone: { fontSize: '16px', flexShrink: 0 },
+  anexoNome: { flex: 1, fontSize: '13px', color: '#1a4731', fontWeight: '500', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  btnRemoverAnexo: { background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '13px', fontWeight: '700', flexShrink: 0, padding: '0 2px' },
+  btnUpload: { padding: '9px 16px', borderRadius: '8px', border: '1.5px dashed #d1d5db', background: 'white', cursor: 'pointer', fontSize: '13px', color: '#6b7280', textAlign: 'left', width: '100%' },
   fotosGrid: { display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' },
   fotoCard: { position: 'relative', width: '80px', height: '80px' },
   fotoImg: { width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e5e7eb' },
