@@ -6,11 +6,14 @@ export default function Login() {
   const [senha, setSenha] = useState('')
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState('')
+  const [msgRecuperar, setMsgRecuperar] = useState('')
+  const [enviandoRecuperar, setEnviandoRecuperar] = useState(false)
 
   const handleLogin = async (e) => {
     e.preventDefault()
     setCarregando(true)
     setErro('')
+    setMsgRecuperar('')
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -22,6 +25,25 @@ export default function Login() {
     }
 
     setCarregando(false)
+  }
+
+  const handleRecuperarSenha = async () => {
+    if (!email) {
+      setErro('Digite seu e-mail acima para recuperar a senha.')
+      return
+    }
+    setEnviandoRecuperar(true)
+    setErro('')
+    setMsgRecuperar('')
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/sistema-gestao-fgv/',
+    })
+    if (error) {
+      setErro('Não foi possível enviar o e-mail. Verifique o endereço e tente novamente.')
+    } else {
+      setMsgRecuperar('E-mail de recuperação enviado! Verifique sua caixa de entrada.')
+    }
+    setEnviandoRecuperar(false)
   }
 
   return (
@@ -58,6 +80,7 @@ export default function Login() {
           </div>
 
           {erro && <p style={styles.erro}>{erro}</p>}
+          {msgRecuperar && <p style={styles.sucesso}>{msgRecuperar}</p>}
 
           <button
             type="submit"
@@ -68,6 +91,15 @@ export default function Login() {
             }}
           >
             {carregando ? 'Entrando...' : 'Entrar'}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleRecuperarSenha}
+            disabled={enviandoRecuperar}
+            style={styles.linkSenha}
+          >
+            {enviandoRecuperar ? 'Enviando...' : 'Esqueceu sua senha?'}
           </button>
         </form>
       </div>
@@ -151,5 +183,25 @@ const styles = {
     padding: '10px',
     background: '#fef2f2',
     borderRadius: '6px',
+  },
+  sucesso: {
+    color: '#166534',
+    fontSize: '14px',
+    textAlign: 'center',
+    margin: 0,
+    padding: '10px',
+    background: '#dcfce7',
+    borderRadius: '6px',
+  },
+  linkSenha: {
+    background: 'none',
+    border: 'none',
+    color: '#2d7a4f',
+    fontSize: '14px',
+    cursor: 'pointer',
+    textAlign: 'center',
+    textDecoration: 'underline',
+    padding: '4px',
+    marginTop: '-8px',
   },
 }
