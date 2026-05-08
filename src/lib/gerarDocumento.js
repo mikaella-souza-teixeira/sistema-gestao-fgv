@@ -145,12 +145,17 @@ export async function gerarDocumentoWord(dados) {
     total_passagem:      totalPassagem > 0 ? fmt(totalPassagem) : '',
 
     // ── Transporte ──────────────────────────────────────────────────────────
-    transporte_origem:        dados.transporte_origem        || '',
-    transporte_destino:       dados.transporte_destino       || '',
-    transporte_partida_data:  fmtData(dados.transporte_partida_data),
-    transporte_chegada_data:  fmtData(dados.transporte_chegada_data),
-    transporte_tipo:          dados.transporte_tipo          || '',
-    total_transporte:         totalTransporte > 0 ? fmt(totalTransporte) : '',
+    transporte_origem:         dados.transporte_origem         || '',
+    transporte_destino:        dados.transporte_destino        || '',
+    transporte_partida_data:   fmtData(dados.transporte_partida_data),
+    transporte_partida_hora:   dados.transporte_partida_hora   || '',
+    transporte_chegada_data:   fmtData(dados.transporte_chegada_data),
+    transporte_chegada_hora:   dados.transporte_chegada_hora   || '',
+    // Leg de retorno (origem_2 = destino da ida, destino_2 = origem da ida)
+    transporte_origem_2:       dados.transporte_destino        || '',
+    transporte_destino_2:      dados.transporte_origem         || '',
+    transporte_tipo:           dados.transporte_tipo           || '',
+    total_transporte:          totalTransporte > 0 ? fmt(totalTransporte) : '',
 
     // ── Hospedagem ──────────────────────────────────────────────────────────
     hospedagem_local:    dados.hospedagem_local   || '',

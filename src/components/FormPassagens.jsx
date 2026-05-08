@@ -177,7 +177,8 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
     passagem_valor: '', passagem_bagagem: 'sem despacho de bagagem',
     // Transporte
     transporte_origem: '', transporte_destino: '',
-    transporte_partida_data: '', transporte_chegada_data: '',
+    transporte_partida_data: '', transporte_partida_hora: '',
+    transporte_chegada_data: '', transporte_chegada_hora: '',
     transporte_tipo: 'Veículo Oficial', transporte_valor: '',
     // Hospedagem
     hospedagem_local: '', hospedagem_entrada: '', hospedagem_saida: '',
@@ -738,7 +739,9 @@ export default function FormPassagens({ solicitacao, perfilUsuario, onVoltar, on
               <Campo label="Origem"><input style={styles.input} value={form.transporte_origem} onChange={e => set('transporte_origem', e.target.value)} /></Campo>
               <Campo label="Destino"><input style={styles.input} value={form.transporte_destino} onChange={e => set('transporte_destino', e.target.value)} /></Campo>
               <Campo label="Data de Partida"><input style={styles.input} type="date" value={form.transporte_partida_data} onChange={e => set('transporte_partida_data', e.target.value)} /></Campo>
+              <Campo label="Hora de Partida"><input style={styles.input} value={form.transporte_partida_hora} onChange={e => set('transporte_partida_hora', e.target.value)} placeholder="Ex: 3807/16h50" /></Campo>
               <Campo label="Data de Chegada"><input style={styles.input} type="date" value={form.transporte_chegada_data} onChange={e => set('transporte_chegada_data', e.target.value)} /></Campo>
+              <Campo label="Hora de Chegada"><input style={styles.input} value={form.transporte_chegada_hora} onChange={e => set('transporte_chegada_hora', e.target.value)} placeholder="Ex: 3806/21h05" /></Campo>
               <Campo label="Tipo de Transporte">
                 <select style={styles.input} value={form.transporte_tipo} onChange={e => set('transporte_tipo', e.target.value)}>
                   <option>Veículo Oficial</option>

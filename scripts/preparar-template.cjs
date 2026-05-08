@@ -106,8 +106,11 @@ console.log('✏️  Aplicando substituições de texto...')
 // Ordem IMPORTA: strings mais longas/específicas PRIMEIRO para evitar colisões de substring
 
 const substituicoes = [
-  // ── Data do documento ─────────────────────────────────────────────────────
-  ['DD/MM/AAAA',                       '{data_documento}'],
+  // ── Unidade de origem (célula 3) e solicitante (célula 85) ────────────────
+  ['(exemplo) MMA/SBIO/DCBIO',         '{unidade_solicitante}'],
+
+  // ── Data do documento (célula 4: "XX/XX/2026") ────────────────────────────
+  ['XX/XX/2026',                       '{data_documento}'],
 
   // ── Beneficiário ──────────────────────────────────────────────────────────
   ['XXXXXXXXX XXXXXX',                 '{nome_completo}'],
@@ -132,6 +135,9 @@ const substituicoes = [
   ['XXXX/MMA',                         '{unidade_solicitante}'],
   ['Xxxxxxxxxx',                       '{nome_solicitante}'],
 
+  // ── Hospedagem ────────────────────────────────────────────────────────────
+  ['Hotel',                            '{hospedagem_local}'],
+
   // ── Totais ────────────────────────────────────────────────────────────────
   ['R$ 0.000,00',                      '{total_geral}'],
 ]
@@ -147,11 +153,43 @@ xml = xml.split('XXX').join('{codigo_banco}')  // código COMPE banco (célula 4
 // ─── Passo 3: Substituições por ocorrência ───────────────────────────────────
 console.log('🔢 Substituindo ocorrências numeradas...')
 
-// "Campo Grande" aparece 4x: passagem ida (orig/dest) e passagem volta / transporte (orig/dest)
-xml = replaceNth(xml, 'Campo Grande', '{passagem_orig_1}',  1)
-xml = replaceNth(xml, 'Campo Grande', '{passagem_dest_1}',  1)
-xml = replaceNth(xml, 'Campo Grande', '{passagem_orig_2}',  1)
-xml = replaceNth(xml, 'Campo Grande', '{passagem_dest_2}',  1)
+// "Campo Grande" aparece 4x no template original, nesta ordem de documento:
+//   Célula 63 → passagem ida origem
+//   Célula 70 → passagem volta destino
+//   Célula 110 → transporte ida origem
+//   Célula 117 → transporte volta destino
+xml = replaceNth(xml, 'Campo Grande', '{passagem_orig_1}',    1) // célula 63
+xml = replaceNth(xml, 'Campo Grande', '{passagem_dest_2}',    1) // célula 70 (volta destino)
+xml = replaceNth(xml, 'Campo Grande', '{transporte_origem}',  1) // célula 110
+xml = replaceNth(xml, 'Campo Grande', '{transporte_destino_2}', 1) // célula 117
+
+// "Brasília" aparece 4x, nesta ordem:
+//   Célula 64 → passagem ida destino
+//   Célula 69 → passagem volta origem
+//   Célula 111 → transporte ida destino
+//   Célula 116 → transporte volta origem
+xml = replaceNth(xml, 'Brasília', '{passagem_dest_1}',    1) // célula 64
+xml = replaceNth(xml, 'Brasília', '{passagem_orig_2}',    1) // célula 69
+xml = replaceNth(xml, 'Brasília', '{transporte_destino}', 1) // célula 111
+xml = replaceNth(xml, 'Brasília', '{transporte_origem_2}',1) // célula 116
+
+// Datas de passagem (cada valor aparece 2x: passagem e transporte)
+xml = replaceNth(xml, '9/12/25',    '{passagem_ida_data}',       1) // célula 65
+xml = replaceNth(xml, '9/12/25',    '{transporte_partida_data}', 1) // célula 112
+xml = replaceNth(xml, '12/12/25',   '{passagem_volta_data}',     1) // célula 73
+xml = replaceNth(xml, '12/12/25',   '{transporte_chegada_data}', 1) // célula 120
+
+// Voos/horas de passagem (cada valor aparece 2x: passagem e transporte)
+xml = replaceNth(xml, '3807/16h50', '{passagem_ida_hora}',       1) // célula 66
+xml = replaceNth(xml, '3807/16h50', '{transporte_partida_hora}', 1) // célula 113
+xml = replaceNth(xml, '3806/21h05', '{passagem_volta_hora}',     1) // célula 74
+xml = replaceNth(xml, '3806/21h05', '{transporte_chegada_hora}', 1) // célula 121
+
+// Datas de hospedagem: "XX/XX/XX" aparece 4x (2 rows × 2 colunas)
+// Substitui as 2 primeiras (row 1) e limpa o restante
+xml = replaceNth(xml, 'XX/XX/XX', '{hospedagem_entrada}', 1) // célula 156
+xml = replaceNth(xml, 'XX/XX/XX', '{hospedagem_saida}',   1) // célula 157
+xml = xml.split('XX/XX/XX').join('') // limpa row 2 (células 160-161)
 
 // "R$ -" aparece 3x: totais de passagem, transporte e hospedagem
 xml = replaceNth(xml, 'R$ -', '{total_passagem}',   1)
